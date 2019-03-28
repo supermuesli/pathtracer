@@ -298,9 +298,9 @@ func main() {
 	}
 	
 	// how many times a single pixel is sampled
-	pixel_samples     := 8
+	pixel_samples     := 16
 	// how many times a ray bounces
-	hops              := 2
+	hops              := 3
 	
 	renderer.SetDrawColor(0, 0, 0, 255)
 	renderer.Clear()
@@ -311,8 +311,6 @@ func main() {
 		for x := 0; x < len(frame_buffer); x++ {
 			for y := 0; y < len(frame_buffer[0]); y++ {
 				// draw pixels
-				// g := 0
-				// frame_buffer[x][y].Scale(float64(1/accumulation_size+1+g))
 				renderer.SetDrawColor(uint8(frame_buffer[x][y].X), uint8(frame_buffer[x][y].Y), uint8(frame_buffer[x][y].Z), 255)
 				renderer.DrawPoint(int32(x), int32(y))
 			} 
@@ -357,10 +355,11 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 
 				for h := 0; h < hops; h++ {
 					hops_done += 1
-					pixel_color, surface_triangle, distance, emission := trace(&object.Line{origin, direction})
+					pixel_color, _, distance, emission := trace(&object.Line{origin, direction})
 					
 					// no intersection, ray probably left the cornel box
 					if distance == inf {
+						color.Scale(0)
 						break
 					}
 
@@ -368,7 +367,7 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 					color.Add(pixel_color)
 
 					// hit a light source
-					if weight > 0.0 {
+					if emission > 0.0 {
 						// lambert := direction
 						// color.Scale(lambert.Dot(surface_normal(&surface_triangle)))
 						break
@@ -380,7 +379,8 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 					origin.Add(direction)
 
 					// <update direction>
-					m := vec3.Vec3{rand_neg_float(),rand_neg_float(),rand_neg_float()}
+					m := vec3.Vec3{rand_neg_float(), rand_neg_float(), rand_neg_float()}
+					/*
 					n := surface_normal(&surface_triangle)
 					for {
 						m.Normalize()
@@ -388,23 +388,18 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 							break
 						}
 
-						m = vec3.Vec3{rand_neg_float(),rand_neg_float(),rand_neg_float()}
+						m = vec3.Vec3{rand_neg_float(), rand_neg_float(), rand_neg_float()}
 					}
-					
-					n.Scale(rand_float())
-					m.Scale(rand_float())
+					*/
 					direction = m
-					direction.Add(n)
 					direction.Normalize()
 					// </update direction>
 				}
-
-				weight /= float64(hops_done)
 				color.Scale(1.0/float64(hops_done))
 			}
 
 			weight /= float64(samples)
-			color.Scale(1.0/float64(samples))
+			color.Scale(weight/float64(samples))
 
 			frame_buffer[x][y] = color
 		}
