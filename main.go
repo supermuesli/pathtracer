@@ -15,6 +15,7 @@ import (
 	"os"
 	"fmt"
 	"math/rand"
+	"strconv"
 	_ "time"
 )
 
@@ -45,12 +46,11 @@ func rand_neg_float() float64 {
 	return res
 }
 
-// takes a ray and checks for intersections among all objects in 3d space
-// returns closest primitive (triangle), color and hit distance
+// takes a ray and checks for intersections among all objects in world space
+// returns color, closest primitive (triangle), hit distance and emission
 func trace(ray *object.Line) (vec3.Vec3, object.Triangle, float64, float64) {
 	min_dist := inf
 	closest_hit_color := vec3.Vec3{0, 0, 0}
-	// TODO THIS MIGHT CAUSE DUMB SHIT TO HAPPEN
 	closest_triangle := objects[0].Mesh[0]
 	emission := 0.0
 
@@ -83,6 +83,25 @@ func surface_normal(tri *object.Triangle) vec3.Vec3 {
 	normal.Cross(c)
 	normal.Normalize()
 	return normal
+}
+
+func max (a float64, b float64) float64 {
+	if a < b {
+		return b
+	}
+
+	return a
+}
+
+func cosine_hemisphere_sample() vec3.Vec3 {
+	u1 := rand_float()
+    r := math.Sqrt(u1)
+    theta := 2 * math.Pi * rand_float()
+ 
+    x := r * math.Cos(theta)
+    y := r * math.Sin(theta)
+ 
+    return vec3.Vec3{x, y, math.Sqrt(max(0.0, 1.0 - u1))}
 }
 
 func save_frame_buffer_to_png(frame_buffer [][]vec3.Vec3, output_name string) {
@@ -155,7 +174,7 @@ func main() {
 	// define materials
 	room_material := object.Material {
 		Ambient_color : vec3.Vec3{111, 111, 255},
-		Diffuse_color : vec3.Vec3{0, 0, 255},
+		Diffuse_color : vec3.Vec3{0, 255, 0},
 		Specular_color: vec3.Vec3{0, 50, 200},
 		Emission      : 0,
 	}
@@ -277,6 +296,7 @@ func main() {
 				vec3.Vec3{float64(width/2) + float64(spotlight1_radius/2), 0.0000002, float64(width/2) + float64(spotlight1_radius/2)},
 			},
 			object.Triangle {
+
 				vec3.Vec3{float64(width/2) + float64(spotlight1_radius/2), 0.0000002, float64(width/2) + float64(spotlight1_radius/2)},
 				vec3.Vec3{float64(width/2) - float64(spotlight1_radius/2), 0.0000002, float64(width/2) - float64(spotlight1_radius/2)},
 				vec3.Vec3{float64(width/2) + float64(spotlight1_radius/2), 0.0000002, float64(width/2) - float64(spotlight1_radius/2)},
@@ -298,7 +318,7 @@ func main() {
 	}
 	
 	// how many times a single pixel is sampled
-	pixel_samples     := 16
+	pixel_samples     := 32
 	// how many times a ray bounces
 	hops              := 3
 	
@@ -307,18 +327,17 @@ func main() {
 
 	frame_buffer := render_frame(camera, pixel_samples, hops)
 
-	for {
-		for x := 0; x < len(frame_buffer); x++ {
-			for y := 0; y < len(frame_buffer[0]); y++ {
-				// draw pixels
-				renderer.SetDrawColor(uint8(frame_buffer[x][y].X), uint8(frame_buffer[x][y].Y), uint8(frame_buffer[x][y].Z), 255)
-				renderer.DrawPoint(int32(x), int32(y))
-			} 
-		}
-
-		// show pixels on window
-		renderer.Present()
+	for x := 0; x < len(frame_buffer); x++ {
+		for y := 0; y < len(frame_buffer[0]); y++ {
+			// draw pixels
+			renderer.SetDrawColor(uint8(frame_buffer[x][y].X), uint8(frame_buffer[x][y].Y), uint8(frame_buffer[x][y].Z), 255)
+			renderer.DrawPoint(int32(x), int32(y))
+		} 
 	}
+
+	// show pixels on window
+	renderer.Present()
+	save_frame_buffer_to_png(frame_buffer, "output@" + strconv.Itoa(pixel_samples) + "_samples")
 }
 
 func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera camera.Camera, frame_buffer [][]vec3.Vec3, samples int, hops int, wg **sync.WaitGroup) {
@@ -329,6 +348,7 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 	// camera position data: compute this only once
 	cam_x := camera.Origin.X - float64(camera.Width/2)
 	cam_y := camera.Origin.Y - float64(camera.Height/2)
+	zero_vector := vec3.Vec3{0, 0, 0}
 	
 	// this jumbo wumbo loop solves the rendering equations for path tracing
 	for x := start_x; x < end_x; x++ {
@@ -344,32 +364,36 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 			
 			camera_ray_dir.Sub(camera.Origin)
 			camera_ray_dir.Normalize()
-
-			weight := 0.0
-			color := vec3.Vec3{0, 0, 0}
+			color := zero_vector
 
 			for s := 0; s < samples; s++ {
 				hops_done := 0
 				origin := camera.Origin
 				direction := camera_ray_dir
-
+				cur_weight := 1.0
+				cur_color := zero_vector
+				hit_a_light_source := false
 				for h := 0; h < hops; h++ {
 					hops_done += 1
-					pixel_color, _, distance, emission := trace(&object.Line{origin, direction})
-					
+					pixel_color, surface_triangle, distance, emission := trace(&object.Line{origin, direction})
+
 					// no intersection, ray probably left the cornel box
 					if distance == inf {
-						color.Scale(0)
+						cur_color = zero_vector
 						break
 					}
 
-					weight += emission
-					color.Add(pixel_color)
+					// ---------------------------------------------------------------------------
+					// DO NOT USE closest_triangle BEFORE THIS LINE
+					// ONLY USE closest_triangle IF INTERSECTION OCCURRED
+					// ---------------------------------------------------------------------------
+
+					cur_color.Add(pixel_color)
+					cur_weight += emission
 
 					// hit a light source
 					if emission > 0.0 {
-						// lambert := direction
-						// color.Scale(lambert.Dot(surface_normal(&surface_triangle)))
+						hit_a_light_source = true
 						break
 					}
 
@@ -379,41 +403,53 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 					origin.Add(direction)
 
 					// <update direction>
-					m := vec3.Vec3{rand_neg_float(), rand_neg_float(), rand_neg_float()}
-					/*
 					n := surface_normal(&surface_triangle)
-					for {
-						m.Normalize()
-						if math.Abs(n.Dot(m)) <= 0.05 {
-							break
-						}
-
-						m = vec3.Vec3{rand_neg_float(), rand_neg_float(), rand_neg_float()}
-					}
-					*/
+					
+					u1 := rand_float()
+					u2 := rand_float()
+					r := math.Sqrt(u1)
+					theta := 2 * math.Pi * u2
+					x1 := r * math.Cos(theta)
+					y1 := r * math.Sin(theta)
+					m := vec3.Vec3{x1, y1, math.Sqrt(max(0.0, 1.0 - u1))}
+					m.Normalize()
+					angle := math.Acos(m.Dot(n))*180/math.Pi // angle between n and m; converted radians to degrees
+					m.Rotate_around_normal(angle, n)
 					direction = m
-					direction.Normalize()
+
 					// </update direction>
 				}
-				color.Scale(1.0/float64(hops_done))
+
+				if hit_a_light_source {
+					cur_color.Scale(cur_weight)
+					color.Add(cur_color)
+				}
+				
+			}
+			color.Scale(1.0/float64(samples))
+
+			// prevent overflow
+			_max := color.X
+			if color.Y > color.X {
+				_max = color.Y
+			}
+			if color.Z > color.Y {
+				_max = color.Z
+			}
+			if _max != 0.0 && _max > 255.0 {
+				color.Scale(255.0/_max)
 			}
 
-			weight /= float64(samples)
-			color.Scale(weight/float64(samples))
-
 			frame_buffer[x][y] = color
+			// gamma correction
+			frame_buffer[x][y].X = math.Pow(frame_buffer[x][y].X/255, 1.0/2.20)
+			frame_buffer[x][y].Y = math.Pow(frame_buffer[x][y].Y/255, 1.0/2.20)
+			frame_buffer[x][y].Z = math.Pow(frame_buffer[x][y].Z/255, 1.0/2.20)
+			frame_buffer[x][y].Scale(255)
 		}
 	}
 
 	return
-}
-
-func max (a float64, b float64) float64 {
-	if a < b {
-		return b
-	}
-
-	return a
 }
 
 // renders a frame and generates an output png
@@ -429,7 +465,7 @@ func render_frame(camera camera.Camera, samples int, hops int) [][]vec3.Vec3 {
 		}
 	}
 
-	// multithreading using 4 cpu-cores
+	// multithreading using n cpu-cores
 	cores := 4
 	wg := new(sync.WaitGroup)
 	for c := 0; c < cores; c++ {
