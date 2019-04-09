@@ -318,9 +318,9 @@ func main() {
 	}
 	
 	// how many times a single pixel is sampled
-	pixel_samples     := 32
+	pixel_samples, err := strconv.Atoi(string(os.Args[1]))
 	// how many times a ray bounces
-	hops              := 3
+	hops               := 3
 	
 	renderer.SetDrawColor(0, 0, 0, 255)
 	renderer.Clear()
@@ -404,18 +404,11 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 
 					// <update direction>
 					n := surface_normal(&surface_triangle)
-					
-					u1 := rand_float()
-					u2 := rand_float()
-					r := math.Sqrt(u1)
-					theta := 2 * math.Pi * u2
-					x1 := r * math.Cos(theta)
-					y1 := r * math.Sin(theta)
-					m := vec3.Vec3{x1, y1, math.Sqrt(max(0.0, 1.0 - u1))}
-					m.Normalize()
-					angle := math.Acos(m.Dot(n))*180/math.Pi // angle between n and m; converted radians to degrees
-					m.Rotate_around_normal(angle, n)
-					direction = m
+
+					direction = n
+					direction.Rotate_x(rand_neg_float()*89)
+					direction.Rotate_y(rand_neg_float()*89)
+					direction.Rotate_z(rand_neg_float()*89)
 
 					// </update direction>
 				}
@@ -424,7 +417,6 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 					cur_color.Scale(cur_weight)
 					color.Add(cur_color)
 				}
-				
 			}
 			color.Scale(1.0/float64(samples))
 
@@ -436,9 +428,7 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 			if color.Z > color.Y {
 				_max = color.Z
 			}
-			if _max != 0.0 && _max > 255.0 {
-				color.Scale(255.0/_max)
-			}
+			color.Scale(255.0/_max)
 
 			frame_buffer[x][y] = color
 			// gamma correction
