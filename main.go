@@ -306,7 +306,9 @@ func main() {
 		light_material,
 	}
 
-	objects = append(objects, room, cuboid, cuboid2, lamp1)
+	_ = cuboid
+	_ = cuboid2
+	objects = append(objects, room, cuboid2, lamp1)
 
 	// CPU profiling by default
 	// defer profile.Start().Stop()
@@ -409,7 +411,7 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 					direction.Rotate_x(rand_neg_float()*89)
 					direction.Rotate_y(rand_neg_float()*89)
 					direction.Rotate_z(rand_neg_float()*89)
-
+					direction.Normalize()
 					// </update direction>
 				}
 
