@@ -93,6 +93,14 @@ func max (a float64, b float64) float64 {
 	return a
 }
 
+func min (a float64, b float64) float64 {
+	if a > b {
+		return b
+	}
+
+	return a
+}
+
 func cosine_hemisphere_sample() vec3.Vec3 {
 	u1 := rand_float()
     r := math.Sqrt(u1)
@@ -102,6 +110,12 @@ func cosine_hemisphere_sample() vec3.Vec3 {
     y := r * math.Sin(theta)
  
     return vec3.Vec3{x, y, math.Sqrt(max(0.0, 1.0 - u1))}
+}
+
+func translate(a vec3.Vec3) {
+	for i := 0; i < len(objects); i++ {
+		objects[i].Move(-a.X, -a.Y, -a.Z)
+	}
 }
 
 func save_frame_buffer_to_png(frame_buffer [][]vec3.Vec3, output_name string) {
@@ -199,47 +213,47 @@ func main() {
 	room := object.Object {
 		[](object.Triangle) {
 			// back wall
-			object.Triangle{vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{0, room_size, room_size}, vec3.Vec3{0, 0, room_size}},
-			object.Triangle{vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{0, room_size, room_size}, vec3.Vec3{room_size, room_size, room_size}},
+			object.Triangle{vec3.Vec3{0, 0, room_size}, vec3.Vec3{0, room_size, room_size}, vec3.Vec3{room_size, room_size, room_size}},
+			object.Triangle{vec3.Vec3{0, 0, room_size}, vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, 0, room_size}},
 			// left wall
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, 0}, vec3.Vec3{0, 0, room_size}},
-			object.Triangle{vec3.Vec3{0, 0, room_size}, vec3.Vec3{0, room_size, 0}, vec3.Vec3{0, room_size, room_size}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, 0}, vec3.Vec3{0, room_size, room_size}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, room_size}, vec3.Vec3{0, 0, room_size}},
 			// right wall
-			object.Triangle{vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, 0, 0}},
-			object.Triangle{vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, room_size, room_size}},
+			object.Triangle{vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, 0, 0}},
+			object.Triangle{vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, 0, 0}},
 			// floor
-			object.Triangle{vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{0, room_size, room_size}},
-			object.Triangle{vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{0, room_size, 0}, vec3.Vec3{0, room_size, room_size}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, room_size}, vec3.Vec3{room_size, 0, room_size}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, 0, 0}},
 			// ceiling
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{room_size, 0, 0}, vec3.Vec3{0, 0, room_size}},
-			object.Triangle{vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, 0, 0}, vec3.Vec3{0, 0, room_size}},
+			object.Triangle{vec3.Vec3{0, room_size, 0}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{0, room_size, room_size}},
+			object.Triangle{vec3.Vec3{0, room_size, room_size}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, room_size, room_size}},
 		},
 		// set material
 		room_material,
 	}
 
-	cuboid_size := 350.0/2
+	cuboid_size := 350.0/3
 
 	cuboid := object.Object {
 		[](object.Triangle) {
-			// back plane
-			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{0, 0, cuboid_size}},
-			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}},
-			// left plane
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, 0, cuboid_size}},
-			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}},
-			// right plane
-			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}},
-			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}},
-			// bottom plane
-			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}},
-			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}},
-			// top plane
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, 0, 0}, vec3.Vec3{0, 0, cuboid_size}},
-			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, vec3.Vec3{0, 0, cuboid_size}},
+			// back wall
+			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}},
+			// left wall
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{0, 0, cuboid_size}},
+			// right wall
+			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}},
+			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}},
+			// floor
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}},
+			// ceiling
+			object.Triangle{vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}},
 			// front plane
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, 0, 0}, vec3.Vec3{0, cuboid_size, 0}},
-			object.Triangle{vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}},
 		},
 		// set material
 		box_material,
@@ -247,32 +261,84 @@ func main() {
 
 	cuboid2 := object.Object {
 		[](object.Triangle) {
-			// back plane
-			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{0, 0, cuboid_size}},
-			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}},
-			// left plane
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, 0, cuboid_size}},
-			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}},
-			// right plane
-			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}},
-			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}},
-			// bottom plane
-			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}},
-			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}},
-			// top plane
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, 0, 0}, vec3.Vec3{0, 0, cuboid_size}},
-			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, vec3.Vec3{0, 0, cuboid_size}},
+			// back wall
+			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}},
+			// left wall
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{0, 0, cuboid_size}},
+			// right wall
+			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}},
+			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}},
+			// floor
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}},
+			// ceiling
+			object.Triangle{vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}},
 			// front plane
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, 0, 0}, vec3.Vec3{0, cuboid_size, 0}},
-			object.Triangle{vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}},
+		},
+		// set material
+		box_material,
+	}
+
+	cuboid3 := object.Object {
+		[](object.Triangle) {
+			// back wall
+			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}},
+			// left wall
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{0, 0, cuboid_size}},
+			// right wall
+			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}},
+			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}},
+			// floor
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}},
+			// ceiling
+			object.Triangle{vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}},
+			// front plane
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}},
+		},
+		// set material
+		box_material,
+	}
+
+	cuboid4 := object.Object {
+		[](object.Triangle) {
+			// back wall
+			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}},
+			// left wall
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{0, 0, cuboid_size}},
+			// right wall
+			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}},
+			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}},
+			// floor
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}},
+			// ceiling
+			object.Triangle{vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}},
+			// front plane
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}},
 		},
 		// set material
 		box_material,
 	}
 
 	// example of how you can move an object
-	cuboid.Move(600/2, 350/2, 600/2)
-	cuboid2.Move(100/2, 650/2, 50/2)
+	cuboid.Move(1, 1, 0)
+	cuboid2.Move(1 + cuboid_size, 1 + cuboid_size, 1 + cuboid_size)
+	cuboid3.Move(1 + 2*cuboid_size, 1 + 2*cuboid_size, 1 + 2*cuboid_size)
+	cuboid4.Move(1 + 3*cuboid_size, 1 + 3*cuboid_size, 1 + 3*cuboid_size)
 
 	// output dimensions
 	width := 1000/2
@@ -288,19 +354,18 @@ func main() {
 	// define light sources
 	spotlight1_radius := 200.0/2
 
+	depth := height
+
 	lamp1 := object.Object {
 		[]object.Triangle {
 			object.Triangle {
-				vec3.Vec3{float64(width/2) - float64(spotlight1_radius/2), 0.0000002, float64(width/2) - float64(spotlight1_radius/2)},
-				vec3.Vec3{float64(width/2) - float64(spotlight1_radius/2), 0.0000002, float64(width/2) + float64(spotlight1_radius/2)},
-				vec3.Vec3{float64(width/2) + float64(spotlight1_radius/2), 0.0000002, float64(width/2) + float64(spotlight1_radius/2)},
-			},
+				vec3.Vec3{float64(width/2) - float64(spotlight1_radius/2), 0.0000001, float64(depth/2) - float64(spotlight1_radius/2)}, 
+				vec3.Vec3{float64(width/2) + float64(spotlight1_radius/2), 0.0000001, float64(width/2) - float64(spotlight1_radius/2)}, 
+				vec3.Vec3{float64(width/2) - float64(spotlight1_radius/2), 0.0000001, float64(depth/2) + float64(spotlight1_radius/2)}},
 			object.Triangle {
-
-				vec3.Vec3{float64(width/2) + float64(spotlight1_radius/2), 0.0000002, float64(width/2) + float64(spotlight1_radius/2)},
-				vec3.Vec3{float64(width/2) - float64(spotlight1_radius/2), 0.0000002, float64(width/2) - float64(spotlight1_radius/2)},
-				vec3.Vec3{float64(width/2) + float64(spotlight1_radius/2), 0.0000002, float64(width/2) - float64(spotlight1_radius/2)},
-			},
+				vec3.Vec3{float64(width/2) - float64(spotlight1_radius/2), 0.0000001, float64(depth/2) + float64(spotlight1_radius/2)}, 
+				vec3.Vec3{float64(width/2) + float64(spotlight1_radius/2), 0.0000001, float64(depth/2) - float64(spotlight1_radius/2)}, 
+				vec3.Vec3{float64(width/2) + float64(spotlight1_radius/2), 0.0000001, float64(depth/2) + float64(spotlight1_radius/2)}},
 		},
 		// set material
 		light_material,
@@ -308,7 +373,9 @@ func main() {
 
 	_ = cuboid
 	_ = cuboid2
-	objects = append(objects, room, cuboid2, lamp1)
+	_ = cuboid3
+	_ = cuboid4
+	objects = append(objects, room, cuboid, cuboid2, cuboid3, cuboid4, lamp1)
 
 	// CPU profiling by default
 	// defer profile.Start().Stop()
@@ -322,7 +389,7 @@ func main() {
 	// how many times a single pixel is sampled
 	pixel_samples, err := strconv.Atoi(string(os.Args[1]))
 	// how many times a ray bounces
-	hops               := 3
+	hops               := 4
 	
 	renderer.SetDrawColor(0, 0, 0, 255)
 	renderer.Clear()
@@ -390,6 +457,9 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 					// ONLY USE closest_triangle IF INTERSECTION OCCURRED
 					// ---------------------------------------------------------------------------
 
+					n := surface_normal(&surface_triangle)
+
+					// lambert shading
 					cur_color.Add(pixel_color)
 					cur_weight += emission
 
@@ -405,13 +475,15 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 					origin.Add(direction)
 
 					// <update direction>
-					n := surface_normal(&surface_triangle)
+					direction = vec3.Vec3{rand_neg_float(), rand_neg_float(), rand_neg_float()}
 
-					direction = n
-					direction.Rotate_x(rand_neg_float()*89)
-					direction.Rotate_y(rand_neg_float()*89)
-					direction.Rotate_z(rand_neg_float()*89)
-					direction.Normalize()
+					for {
+						direction.Normalize()
+						if direction.Dot(n) > 0 {
+							break
+						}
+						direction = vec3.Vec3{rand_neg_float(), rand_neg_float(), rand_neg_float()}
+					}
 					// </update direction>
 				}
 
@@ -430,7 +502,10 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 			if color.Z > color.Y {
 				_max = color.Z
 			}
-			color.Scale(255.0/_max)
+
+			if _max > 255 {
+				color.Scale(255.0/_max)
+			}
 
 			frame_buffer[x][y] = color
 			// gamma correction
