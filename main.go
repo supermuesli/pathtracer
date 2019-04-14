@@ -29,6 +29,7 @@ var float_offset int = -1
 var float_amount int = 1000000
 var inf float64 = math.Inf(1)
 var objects []object.Object
+var spheres []object.Sphere
 
 // returns the next random float in sequence
 func rand_float() float64 {
@@ -47,12 +48,13 @@ func rand_neg_float() float64 {
 }
 
 // takes a ray and checks for intersections among all objects in world space
-// returns color, closest primitive (triangle), hit distance and emission
-func trace(ray *object.Line) (vec3.Vec3, object.Triangle, float64, float64) {
+// returns color, normal, hit distance and emission
+func trace(ray *object.Line) (vec3.Vec3, vec3.Vec3, float64, float64, (func(vec3.Vec3, vec3.Vec3) vec3.Vec3)) {
 	min_dist := inf
 	closest_hit_color := vec3.Vec3{0, 0, 0}
-	closest_triangle := objects[0].Mesh[0]
+	normal := vec3.Vec3{0, 0, 0}
 	emission := 0.0
+	var pdf func(vec3.Vec3, vec3.Vec3) vec3.Vec3
 
 	for i := 0; i < len(objects); i++ {
 		// iterate through object mesh (triangles)
@@ -63,15 +65,39 @@ func trace(ray *object.Line) (vec3.Vec3, object.Triangle, float64, float64) {
 				// only keep the closest intersections
 				if hit_distance < min_dist {
 					min_dist = hit_distance
-					closest_hit_color = objects[i].Mterial.Diffuse_color
-					closest_triangle = objects[i].Mesh[j]
-					emission = objects[i].Mterial.Emission
+					closest_hit_color = objects[i].Mesh[j].Mterial.Diffuse_color
+					normal = surface_normal(&objects[i].Mesh[j])
+					emission = objects[i].Mesh[j].Mterial.Emission
+					pdf = objects[i].Mesh[j].Pdf
 				}
 			}
 		}
 	}
 
-	return closest_hit_color, closest_triangle, min_dist, emission
+	for i := 0; i < len(spheres); i++ {
+		intersection, hit_distance := spheres[i].Intersection(ray)
+		if intersection {
+			// only keep the closest intersections
+			if hit_distance < min_dist {
+				min_dist = hit_distance
+				closest_hit_color = spheres[i].Mterial.Diffuse_color
+				
+				// compute normal
+				hit_position := ray.Origin
+				d := ray.Dir
+				d.Scale(hit_distance)
+				hit_position.Add(d)
+				normal = hit_position
+				normal.Sub(spheres[i].Origin)
+				normal.Normalize()
+
+				emission = spheres[i].Mterial.Emission
+				pdf = spheres[i].Pdf
+			}
+		}
+	}
+
+	return closest_hit_color, normal, min_dist, emission, pdf
 }
 
 func surface_normal(tri *object.Triangle) vec3.Vec3 {
@@ -110,12 +136,6 @@ func cosine_hemisphere_sample() vec3.Vec3 {
     y := r * math.Sin(theta)
  
     return vec3.Vec3{x, y, math.Sqrt(max(0.0, 1.0 - u1))}
-}
-
-func translate(a vec3.Vec3) {
-	for i := 0; i < len(objects); i++ {
-		objects[i].Move(-a.X, -a.Y, -a.Z)
-	}
 }
 
 func save_frame_buffer_to_png(frame_buffer [][]vec3.Vec3, output_name string) {
@@ -186,25 +206,53 @@ func main() {
 	// ************************************************************
 	//
 	// define materials
-	room_material := object.Material {
-		Ambient_color : vec3.Vec3{111, 111, 255},
+	green := object.Material {
 		Diffuse_color : vec3.Vec3{0, 255, 0},
-		Specular_color: vec3.Vec3{0, 50, 200},
 		Emission      : 0,
 	}
 
-	box_material := object.Material {
-		Ambient_color : vec3.Vec3{0, 0, 255},
+	white := object.Material {
 		Diffuse_color : vec3.Vec3{255, 255, 255},
-		Specular_color: vec3.Vec3{0, 50, 200},
 		Emission      : 0,
 	}
 
-	light_material := object.Material {
-		Ambient_color : vec3.Vec3{255, 255, 255},
+	blue := object.Material {
+		Diffuse_color : vec3.Vec3{0, 0, 255},
+		Emission      : 0,
+	}
+
+	red := object.Material {
+		Diffuse_color : vec3.Vec3{255, 0, 0},
+		Emission      : 0,
+	}
+
+	purple := object.Material {
+		Diffuse_color : vec3.Vec3{200, 0, 200},
+		Emission      : 0,
+	}
+
+	white_light := object.Material {
 		Diffuse_color : vec3.Vec3{255, 255, 255},
-		Specular_color: vec3.Vec3{255, 255, 255},
 		Emission      : 1.0,
+	}
+
+	diffuse_pdf := func(incident vec3.Vec3, n vec3.Vec3) vec3.Vec3 {
+		direction := vec3.Vec3{rand_neg_float(), rand_neg_float(), rand_neg_float()}
+		for {
+			direction.Normalize()
+			if direction.Dot(n) >= 0 {
+				break
+			}
+			direction = vec3.Vec3{rand_neg_float(), rand_neg_float(), rand_neg_float()}
+		}
+
+		return direction
+	}
+
+	specular_pdf := func(incident vec3.Vec3, n vec3.Vec3) vec3.Vec3 {
+		n.Scale(2*incident.Dot(n))
+		incident.Sub(n)
+		return incident
 	}
 
 	room_size := 1000.0/2
@@ -213,132 +261,133 @@ func main() {
 	room := object.Object {
 		[](object.Triangle) {
 			// back wall
-			object.Triangle{vec3.Vec3{0, 0, room_size}, vec3.Vec3{0, room_size, room_size}, vec3.Vec3{room_size, room_size, room_size}},
-			object.Triangle{vec3.Vec3{0, 0, room_size}, vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, 0, room_size}},
+			object.Triangle{vec3.Vec3{0, 0, room_size}, vec3.Vec3{0, room_size, room_size}, vec3.Vec3{room_size, room_size, room_size}, diffuse_pdf, green},
+			object.Triangle{vec3.Vec3{0, 0, room_size}, vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, 0, room_size}, diffuse_pdf, green},
 			// left wall
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, 0}, vec3.Vec3{0, room_size, room_size}},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, room_size}, vec3.Vec3{0, 0, room_size}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, 0}, vec3.Vec3{0, room_size, room_size}, diffuse_pdf, red},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, room_size}, vec3.Vec3{0, 0, room_size}, diffuse_pdf, red},
 			// right wall
-			object.Triangle{vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, 0, 0}},
-			object.Triangle{vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, 0, 0}},
-			// floor
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, room_size}, vec3.Vec3{room_size, 0, room_size}},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, 0, 0}},
+			object.Triangle{vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, blue},
+			object.Triangle{vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, blue},
 			// ceiling
-			object.Triangle{vec3.Vec3{0, room_size, 0}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{0, room_size, room_size}},
-			object.Triangle{vec3.Vec3{0, room_size, room_size}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, room_size, room_size}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, room_size}, vec3.Vec3{room_size, 0, room_size}, diffuse_pdf, purple},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, purple},
+			// floor
+			object.Triangle{vec3.Vec3{0, room_size, 0}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{0, room_size, room_size}, specular_pdf, white},
+			object.Triangle{vec3.Vec3{0, room_size, room_size}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, room_size, room_size}, specular_pdf, white},
 		},
-		// set material
-		room_material,
 	}
 
-	cuboid_size := 350.0/3
+	cuboid_size := 300.0
 
 	cuboid := object.Object {
 		[](object.Triangle) {
 			// back wall
-			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}},
-			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}, diffuse_pdf, white},
 			// left wall
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{0, 0, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{0, 0, cuboid_size}, diffuse_pdf, white},
 			// right wall
-			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}},
-			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}},
-			// floor
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}},
+			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
 			// ceiling
-			object.Triangle{vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}},
-			object.Triangle{vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
+			// floor
+			object.Triangle{vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, diffuse_pdf, white},
 			// front plane
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
 		},
-		// set material
-		box_material,
 	}
 
 	cuboid2 := object.Object {
 		[](object.Triangle) {
 			// back wall
-			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}},
-			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}, diffuse_pdf, white},
 			// left wall
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{0, 0, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{0, 0, cuboid_size}, diffuse_pdf, white},
 			// right wall
-			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}},
-			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}},
-			// floor
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}},
+			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
 			// ceiling
-			object.Triangle{vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}},
-			object.Triangle{vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
+			// floor
+			object.Triangle{vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, diffuse_pdf, white},
 			// front plane
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
 		},
-		// set material
-		box_material,
 	}
 
 	cuboid3 := object.Object {
 		[](object.Triangle) {
 			// back wall
-			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}},
-			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}, diffuse_pdf, white},
 			// left wall
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{0, 0, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{0, 0, cuboid_size}, diffuse_pdf, white},
 			// right wall
-			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}},
-			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}},
-			// floor
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}},
+			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
 			// ceiling
-			object.Triangle{vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}},
-			object.Triangle{vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
+			// floor
+			object.Triangle{vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, diffuse_pdf, white},
 			// front plane
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
 		},
-		// set material
-		box_material,
 	}
 
 	cuboid4 := object.Object {
 		[](object.Triangle) {
 			// back wall
-			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}},
-			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}, diffuse_pdf, white},
 			// left wall
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{0, 0, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{0, 0, cuboid_size}, diffuse_pdf, white},
 			// right wall
-			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}},
-			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}},
-			// floor
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}},
+			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
 			// ceiling
-			object.Triangle{vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}},
-			object.Triangle{vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
+			// floor
+			object.Triangle{vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, diffuse_pdf, white},
 			// front plane
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
 		},
-		// set material
-		box_material,
 	}
 
 	// example of how you can move an object
 	cuboid.Move(1, 1, 0)
 	cuboid2.Move(1 + cuboid_size, 1 + cuboid_size, 1 + cuboid_size)
-	cuboid3.Move(1 + 2*cuboid_size, 1 + 2*cuboid_size, 1 + 2*cuboid_size)
-	cuboid4.Move(1 + 3*cuboid_size, 1 + 3*cuboid_size, 1 + 3*cuboid_size)
+
+	cuboid3.Move(1 + 1.8*cuboid_size, 1 + 1.6*cuboid_size, 1 + 2*cuboid_size)
+	cuboid3.Rotate_x(0.5)
+	cuboid3.Rotate_y(0.3)
+	cuboid3.Rotate_z(0.5)
+	cuboid3.Move(-430, -270, -20)
+
+	sphere1 := object.Sphere {
+		vec3.Vec3{250, 250, 250},
+		100.0,
+		specular_pdf,
+		white,
+	}
 
 	// output dimensions
 	width := 1000/2
@@ -361,21 +410,21 @@ func main() {
 			object.Triangle {
 				vec3.Vec3{float64(width/2) - float64(spotlight1_radius/2), 0.0000001, float64(depth/2) - float64(spotlight1_radius/2)}, 
 				vec3.Vec3{float64(width/2) + float64(spotlight1_radius/2), 0.0000001, float64(width/2) - float64(spotlight1_radius/2)}, 
-				vec3.Vec3{float64(width/2) - float64(spotlight1_radius/2), 0.0000001, float64(depth/2) + float64(spotlight1_radius/2)}},
+				vec3.Vec3{float64(width/2) - float64(spotlight1_radius/2), 0.0000001, float64(depth/2) + float64(spotlight1_radius/2)}, diffuse_pdf, white_light},
 			object.Triangle {
-				vec3.Vec3{float64(width/2) - float64(spotlight1_radius/2), 0.0000001, float64(depth/2) + float64(spotlight1_radius/2)}, 
-				vec3.Vec3{float64(width/2) + float64(spotlight1_radius/2), 0.0000001, float64(depth/2) - float64(spotlight1_radius/2)}, 
-				vec3.Vec3{float64(width/2) + float64(spotlight1_radius/2), 0.0000001, float64(depth/2) + float64(spotlight1_radius/2)}},
+				vec3.Vec3{float64(width/2) - float64(spotlight1_radius/2), 0.0000001, float64(depth/2) + float64(spotlight1_radius/2),}, 
+				vec3.Vec3{float64(width/2) + float64(spotlight1_radius/2), 0.0000001, float64(depth/2) - float64(spotlight1_radius/2),}, 
+				vec3.Vec3{float64(width/2) + float64(spotlight1_radius/2), 0.0000001, float64(depth/2) + float64(spotlight1_radius/2)}, diffuse_pdf, white_light},
 		},
-		// set material
-		light_material,
 	}
 
 	_ = cuboid
 	_ = cuboid2
 	_ = cuboid3
 	_ = cuboid4
-	objects = append(objects, room, cuboid, cuboid2, cuboid3, cuboid4, lamp1)
+	_ = sphere1
+	objects = append(objects, room, lamp1)
+	spheres = append(spheres, sphere1)
 
 	// CPU profiling by default
 	// defer profile.Start().Stop()
@@ -389,7 +438,7 @@ func main() {
 	// how many times a single pixel is sampled
 	pixel_samples, err := strconv.Atoi(string(os.Args[1]))
 	// how many times a ray bounces
-	hops               := 4
+	hops               := 5
 	
 	renderer.SetDrawColor(0, 0, 0, 255)
 	renderer.Clear()
@@ -444,7 +493,7 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 				hit_a_light_source := false
 				for h := 0; h < hops; h++ {
 					hops_done += 1
-					pixel_color, surface_triangle, distance, emission := trace(&object.Line{origin, direction})
+					pixel_color, n, distance, emission, pdf := trace(&object.Line{origin, direction})
 
 					// no intersection, ray probably left the cornel box
 					if distance == inf {
@@ -457,9 +506,9 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 					// ONLY USE closest_triangle IF INTERSECTION OCCURRED
 					// ---------------------------------------------------------------------------
 
-					n := surface_normal(&surface_triangle)
+					// light attentuation (fall-off)
+					pixel_color.Scale(math.Pow(0.95, float64(hops_done-1)))
 
-					// lambert shading
 					cur_color.Add(pixel_color)
 					cur_weight += emission
 
@@ -471,19 +520,13 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 
 					// bounce
 					// update origin
+					incident := direction
+					_ = incident
 					direction.Scale(distance)
 					origin.Add(direction)
 
 					// <update direction>
-					direction = vec3.Vec3{rand_neg_float(), rand_neg_float(), rand_neg_float()}
-
-					for {
-						direction.Normalize()
-						if direction.Dot(n) > 0 {
-							break
-						}
-						direction = vec3.Vec3{rand_neg_float(), rand_neg_float(), rand_neg_float()}
-					}
+					direction = pdf(incident, n)
 					// </update direction>
 				}
 

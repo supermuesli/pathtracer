@@ -2,6 +2,7 @@ package object
 
 import (
 	"github.com/supermuesli/pathtracer/vec3"
+	"math"
 )
 
 type Line struct {
@@ -10,22 +11,23 @@ type Line struct {
 
 type Triangle struct {
 	A, B, C vec3.Vec3
+	Pdf func(vec3.Vec3, vec3.Vec3) vec3.Vec3 
+	Mterial Material
 }
 
 type Sphere struct {
 	Origin vec3.Vec3
 	Radius float64
+	Pdf func(vec3.Vec3, vec3.Vec3) vec3.Vec3 
+	Mterial Material
 }
 
 type Object struct {
 	Mesh []Triangle
-	Mterial Material
 }
 
 type Material struct {
-	Ambient_color vec3.Vec3
 	Diffuse_color vec3.Vec3
-	Specular_color vec3.Vec3
 	Emission float64
 }
 
@@ -37,6 +39,71 @@ func (o *Object) Move(x float64, y float64, z float64) {
 		o.Mesh[i].C.Add(adder)
 		o.Mesh[i].B.Add(adder)
 	}
+}
+
+// rotate object in 3d space
+func (o *Object) Rotate_x(x float64) {
+	for i := 0; i < len(o.Mesh); i++ {
+		o.Mesh[i].A.Rotate_x(x)
+		o.Mesh[i].C.Rotate_x(x)
+		o.Mesh[i].B.Rotate_x(x)
+	}
+}
+
+// rotate object in 3d space
+func (o *Object) Rotate_y(x float64) {
+	for i := 0; i < len(o.Mesh); i++ {
+		o.Mesh[i].A.Rotate_y(x)
+		o.Mesh[i].C.Rotate_y(x)
+		o.Mesh[i].B.Rotate_y(x)
+	}
+}
+
+// rotate object in 3d space
+func (o *Object) Rotate_z(x float64) {
+	for i := 0; i < len(o.Mesh); i++ {
+		o.Mesh[i].A.Rotate_z(x)
+		o.Mesh[i].C.Rotate_z(x)
+		o.Mesh[i].B.Rotate_z(x)
+	}
+}
+
+func min (a float64, b float64) float64 {
+	if a < b {
+		return a
+	}
+
+	return b
+}
+
+func (s Sphere) Intersection(ray *Line) (bool, float64) {
+	ro_so := ray.Origin
+	ro_so.Sub(s.Origin)
+	rd_so_dot := ray.Dir.Dot(ro_so)
+	t := math.Pow(rd_so_dot, 2) - math.Pow(ro_so.Euclidean_norm(), 2) + math.Pow(s.Radius, 2)
+	d1 := -rd_so_dot + math.Sqrt(t)
+	d2 := -rd_so_dot - math.Sqrt(t)
+
+	if d1 < 0 && d2 < 0 {
+		if math.IsNaN(d1) && math.IsNaN(d2) {
+			return false, math.Inf(1)
+		}
+	}
+
+	if math.IsNaN(d1) {
+		d1 = math.Inf(1)
+	}
+
+	if math.IsNaN(d2) {
+		d2 = math.Inf(1)
+	}
+
+	_min := min(d1, d2)
+	if _min > 0 {
+		return true, _min
+	}
+
+	return false, math.Inf(1)
 }
 
 func (t Triangle) Intersection(ray *Line) (bool, float64) {
