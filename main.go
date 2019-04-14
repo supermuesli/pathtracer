@@ -284,28 +284,28 @@ func main() {
 		},
 	}
 
-	cuboid_size := 300.0
+	cuboid_size := 10000.0
 
 	cuboid := object.Object {
 		[](object.Triangle) {
 			// back wall
-			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, diffuse_pdf, blue},
+			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}, diffuse_pdf, blue},
 			// left wall
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{0, 0, cuboid_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, diffuse_pdf, blue},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{0, 0, cuboid_size}, diffuse_pdf, blue},
 			// right wall
-			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, blue},
+			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, blue},
 			// ceiling
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}, diffuse_pdf, blue},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, blue},
 			// floor
-			object.Triangle{vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, diffuse_pdf, blue},
+			object.Triangle{vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, diffuse_pdf, blue},
 			// front plane
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, diffuse_pdf, blue},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, blue},
 		},
 	}
 
@@ -379,7 +379,7 @@ func main() {
 	}
 
 	// example of how you can move an object
-	cuboid.Move(1, 1, 0)
+	cuboid.Move(-2500, -2500, -5000)
 	cuboid2.Move(1 + cuboid_size, 1 + cuboid_size, 1 + cuboid_size)
 
 	cuboid3.Move(1 + 1.8*cuboid_size, 1 + 1.6*cuboid_size, 1 + 2*cuboid_size)
@@ -398,6 +398,13 @@ func main() {
 	sphere2 := object.Sphere {
 		vec3.Vec3{350, 350, 250},
 		120.0,
+		specular_pdf,
+		white,
+	}
+
+	sphere3 := object.Sphere {
+		vec3.Vec3{400, 100, 350},
+		90.0,
 		specular_pdf,
 		white,
 	}
@@ -436,8 +443,9 @@ func main() {
 	_ = cuboid3
 	_ = cuboid4
 	_ = sphere1
+
 	objects = append(objects, room, lamp1)
-	spheres = append(spheres, sphere1, sphere2)
+	spheres = append(spheres, sphere1, sphere2, sphere3)
 
 	// CPU profiling by default
 	// defer profile.Start().Stop()
@@ -451,7 +459,7 @@ func main() {
 	// how many times a single pixel is sampled
 	pixel_samples, err := strconv.Atoi(string(os.Args[1]))
 	// how many times a ray bounces
-	hops               := 5
+	hops               := 7
 	
 	renderer.SetDrawColor(0, 0, 0, 255)
 	renderer.Clear()
