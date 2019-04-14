@@ -2,4 +2,4 @@
 
 # Showcase
 
-![](https://github.com/supermuesli/resources/blob/master/output@1025_samples.png)
+![img](https://github.com/supermuesli/pathtracer/blob/master/output@1025_samples.png)
