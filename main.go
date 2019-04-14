@@ -236,6 +236,12 @@ func main() {
 		Emission      : 1.0,
 	}
 
+	_ = blue
+	_ = red
+	_ = green
+	_ = purple
+	_ = white
+
 	diffuse_pdf := func(incident vec3.Vec3, n vec3.Vec3) vec3.Vec3 {
 		direction := vec3.Vec3{rand_neg_float(), rand_neg_float(), rand_neg_float()}
 		for {
@@ -264,11 +270,11 @@ func main() {
 			object.Triangle{vec3.Vec3{0, 0, room_size}, vec3.Vec3{0, room_size, room_size}, vec3.Vec3{room_size, room_size, room_size}, diffuse_pdf, green},
 			object.Triangle{vec3.Vec3{0, 0, room_size}, vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, 0, room_size}, diffuse_pdf, green},
 			// left wall
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, 0}, vec3.Vec3{0, room_size, room_size}, diffuse_pdf, red},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, room_size}, vec3.Vec3{0, 0, room_size}, diffuse_pdf, red},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, 0}, vec3.Vec3{0, room_size, room_size}, specular_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, room_size}, vec3.Vec3{0, 0, room_size}, specular_pdf, white},
 			// right wall
-			object.Triangle{vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, blue},
-			object.Triangle{vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, blue},
+			object.Triangle{vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, 0, 0}, specular_pdf, white},
+			object.Triangle{vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, 0, 0}, specular_pdf, white},
 			// ceiling
 			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, room_size}, vec3.Vec3{room_size, 0, room_size}, diffuse_pdf, purple},
 			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, purple},
@@ -383,8 +389,15 @@ func main() {
 	cuboid3.Move(-430, -270, -20)
 
 	sphere1 := object.Sphere {
-		vec3.Vec3{250, 250, 250},
-		100.0,
+		vec3.Vec3{150, 150, 250},
+		120.0,
+		specular_pdf,
+		white,
+	}
+
+	sphere2 := object.Sphere {
+		vec3.Vec3{350, 350, 250},
+		120.0,
 		specular_pdf,
 		white,
 	}
@@ -424,7 +437,7 @@ func main() {
 	_ = cuboid4
 	_ = sphere1
 	objects = append(objects, room, lamp1)
-	spheres = append(spheres, sphere1)
+	spheres = append(spheres, sphere1, sphere2)
 
 	// CPU profiling by default
 	// defer profile.Start().Stop()
