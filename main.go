@@ -270,8 +270,8 @@ func main() {
 			object.Triangle{vec3.Vec3{0, 0, room_size}, vec3.Vec3{0, room_size, room_size}, vec3.Vec3{room_size, room_size, room_size}, diffuse_pdf, green},
 			object.Triangle{vec3.Vec3{0, 0, room_size}, vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, 0, room_size}, diffuse_pdf, green},
 			// left wall
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, 0}, vec3.Vec3{0, room_size, room_size}, specular_pdf, white},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, room_size}, vec3.Vec3{0, 0, room_size}, specular_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, 0}, vec3.Vec3{0, room_size, room_size}, diffuse_pdf, red},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, room_size}, vec3.Vec3{0, 0, room_size}, diffuse_pdf, red},
 			// right wall
 			object.Triangle{vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, 0, 0}, specular_pdf, white},
 			object.Triangle{vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, 0, 0}, specular_pdf, white},
@@ -396,7 +396,7 @@ func main() {
 	}
 
 	sphere2 := object.Sphere {
-		vec3.Vec3{350, 350, 250},
+		vec3.Vec3{350, 350, 150},
 		120.0,
 		specular_pdf,
 		white,
@@ -404,6 +404,13 @@ func main() {
 
 	sphere3 := object.Sphere {
 		vec3.Vec3{400, 100, 350},
+		90.0,
+		specular_pdf,
+		white,
+	}
+
+	sphere4 := object.Sphere {
+		vec3.Vec3{150, 350, 350},
 		90.0,
 		specular_pdf,
 		white,
@@ -445,7 +452,7 @@ func main() {
 	_ = sphere1
 
 	objects = append(objects, room, lamp1)
-	spheres = append(spheres, sphere1, sphere2, sphere3)
+	spheres = append(spheres, sphere1, sphere2, sphere3, sphere4)
 
 	// CPU profiling by default
 	// defer profile.Start().Stop()
@@ -459,7 +466,7 @@ func main() {
 	// how many times a single pixel is sampled
 	pixel_samples, err := strconv.Atoi(string(os.Args[1]))
 	// how many times a ray bounces
-	hops               := 7
+	hops               := 15
 	
 	renderer.SetDrawColor(0, 0, 0, 255)
 	renderer.Clear()
