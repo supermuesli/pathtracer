@@ -40,6 +40,10 @@ func (o *Object) Move(x float64, y float64, z float64) {
 		o.Mesh[i].B.Add(adder)
 	}
 }
+// move sphere in 3d space
+func (s *Sphere) Move(x float64, y float64, z float64) {
+	s.Origin.Add(vec3.Vec3{x, y, z})
+}
 
 // rotate object in 3d space
 func (o *Object) Rotate_x(x float64) {
