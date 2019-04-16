@@ -244,6 +244,7 @@ func main() {
 	_ = white
 
 	diffuse_pdf := func(incident vec3.Vec3, n vec3.Vec3) vec3.Vec3 {
+		/*
 		direction := vec3.Vec3{rand_neg_float(), rand_neg_float(), rand_neg_float()}
 		for {
 			direction.Normalize()
@@ -252,8 +253,10 @@ func main() {
 			}
 			direction = vec3.Vec3{rand_neg_float(), rand_neg_float(), rand_neg_float()}
 		}
-
 		return direction
+		*/
+
+		return vec3.Vec3{666, 0, 0}
 	}
 
 	specular_pdf := func(incident vec3.Vec3, n vec3.Vec3) vec3.Vec3 {
@@ -413,7 +416,7 @@ func main() {
 	sphere4 := object.Sphere {
 		vec3.Vec3{150, 350, 350},
 		90.0,
-		diffuse_pdf,
+		specular_pdf,
 		white,
 	}
 
@@ -471,7 +474,7 @@ func main() {
 	}
 	
 	// how many times a ray bounces
-	hops, err := strconv.Atoi(string(os.Args[1]))
+	hops := 5
 	frame_buffer := render_frame(camera, lamp1, hops)
 	save_frame_buffer_to_png(frame_buffer, "output@" + strconv.Itoa(hops) + "_hops")
 
@@ -555,34 +558,46 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 			camera_ray_dir.Sub(camera.Origin)
 			camera_ray_dir.Normalize()
 		
-			pixel_color, _, distance, emission, _ := trace(&object.Line{camera.Origin, camera_ray_dir})
+			pixel_color, n, distance, emission, pdf := trace(&object.Line{camera.Origin, camera_ray_dir})
 			// no intersection, ray probably left the cornel box
 			if distance == inf {
 				continue
+			}
+
+			// compute hitpoint
+			camera_ray_dir.Scale(distance)
+			hit_point := camera.Origin
+			hit_point.Add(camera_ray_dir)
+
+			// TODO wrap this around a hop-loop
+			refl := pdf(camera_ray_dir, n)
+			if refl.X != 666.0 {
+				pixel_color, _, distance, emission, _ = trace(&object.Line{hit_point, refl})
+
+				if distance == inf {
+					continue
+				}
 			}
 
 			frame_buffer[x][y] = pixel_color
 
 			// hit a non-light-emitting object
 			if emission == 0.0 {
-				// compute hitpoint
-				camera_ray_dir.Scale(distance)
-				cam_o := camera.Origin
-				cam_o.Add(camera_ray_dir)
-				
 				// cast shadow ray
 				shadow_ray_dir := lamp_middle
-				shadow_ray_dir.Sub(cam_o)
+				shadow_ray_dir.Sub(hit_point)
 				shadow_ray_dir.Normalize()
-				_, n, distance, emission, _ := trace(&object.Line{cam_o, shadow_ray_dir})
+				_, n, distance, emission, _ = trace(&object.Line{hit_point, shadow_ray_dir})
 
 				if distance == inf {
 					continue
 				}
 
 				if emission == 0.0 {
+					// didn't hit a light source
 					frame_buffer[x][y] = zero_vector
 				} else {
+					// hit a light source
 					frame_buffer[x][y].Scale(math.Abs(n.Dot(shadow_ray_dir)))
 				}
 			}
