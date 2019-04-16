@@ -89,7 +89,9 @@ func trace(ray *object.Line) (vec3.Vec3, vec3.Vec3, float64, float64, (func(vec3
 				hit_position.Add(d)
 				normal = hit_position
 				normal.Sub(spheres[i].Origin)
-				normal.Normalize()
+				// normalize by dividing by radius instead of using Normalize()
+				// much faster :)
+				normal.Scale(1.0/spheres[i].Radius)
 
 				emission = spheres[i].Mterial.Emission
 				pdf = spheres[i].Pdf
@@ -466,7 +468,7 @@ func main() {
 	// how many times a single pixel is sampled
 	pixel_samples, err := strconv.Atoi(string(os.Args[1]))
 	// how many times a ray bounces
-	hops               := 15
+	hops               := 5
 	
 	renderer.SetDrawColor(0, 0, 0, 255)
 	renderer.Clear()
