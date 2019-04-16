@@ -90,7 +90,9 @@ func trace(ray *object.Line) (vec3.Vec3, vec3.Vec3, float64, float64, (func(vec3
 				hit_position.Add(d)
 				normal = hit_position
 				normal.Sub(spheres[i].Origin)
-				normal.Normalize()
+				// normalize by dividing by radius instead of using Normalize()
+				// much faster :)
+				normal.Scale(1.0/spheres[i].Radius)
 
 				emission = spheres[i].Mterial.Emission
 				pdf = spheres[i].Pdf
