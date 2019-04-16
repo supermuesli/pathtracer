@@ -97,6 +97,8 @@ func trace(ray *object.Line) (vec3.Vec3, vec3.Vec3, float64, float64, (func(vec3
 		}
 	}
 
+	fmt.Println(min_dist)
+
 	return closest_hit_color, normal, min_dist, emission, pdf
 }
 
@@ -450,9 +452,12 @@ func main() {
 	_ = cuboid3
 	_ = cuboid4
 	_ = sphere1
+	_ = sphere2
+	_ = sphere3
+	_ = sphere4
 
 	objects = append(objects, room, lamp1)
-	spheres = append(spheres, sphere1, sphere2, sphere3, sphere4)
+	spheres = append(spheres, sphere4)
 
 	// CPU profiling by default
 	// defer profile.Start().Stop()
@@ -463,30 +468,31 @@ func main() {
 		floats[i] = rand.Float64()
 	}
 	
-	// how many times a single pixel is sampled
-	pixel_samples, err := strconv.Atoi(string(os.Args[1]))
 	// how many times a ray bounces
-	hops               := 15
+	hops, err := strconv.Atoi(string(os.Args[1]))
 	
 	renderer.SetDrawColor(0, 0, 0, 255)
 	renderer.Clear()
 
-	frame_buffer := render_frame(camera, pixel_samples, hops)
+	frame_buffer := render_frame(camera, lamp1, hops)
 
-	for x := 0; x < len(frame_buffer); x++ {
-		for y := 0; y < len(frame_buffer[0]); y++ {
-			// draw pixels
-			renderer.SetDrawColor(uint8(frame_buffer[x][y].X), uint8(frame_buffer[x][y].Y), uint8(frame_buffer[x][y].Z), 255)
-			renderer.DrawPoint(int32(x), int32(y))
-		} 
+	// game loop
+	for {
+		for x := 0; x < len(frame_buffer); x++ {
+			for y := 0; y < len(frame_buffer[0]); y++ {
+				// draw pixels
+				renderer.SetDrawColor(uint8(frame_buffer[x][y].X), uint8(frame_buffer[x][y].Y), uint8(frame_buffer[x][y].Z), 255)
+				renderer.DrawPoint(int32(x), int32(y))
+			} 
+		}
 	}
 
 	// show pixels on window
 	renderer.Present()
-	save_frame_buffer_to_png(frame_buffer, "output@" + strconv.Itoa(pixel_samples) + "_samples")
+	save_frame_buffer_to_png(frame_buffer, "output@" + strconv.Itoa(hops) + "_hops")
 }
 
-func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera camera.Camera, frame_buffer [][]vec3.Vec3, samples int, hops int, wg **sync.WaitGroup) {
+func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera camera.Camera, frame_buffer [][]vec3.Vec3, lamp object.Object, hops int, wg **sync.WaitGroup) {
 	// multithreading magic, don't touch this
 	_wg := *wg
 	defer _wg.Done()
@@ -495,7 +501,7 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 	cam_x := camera.Origin.X - float64(camera.Width/2)
 	cam_y := camera.Origin.Y - float64(camera.Height/2)
 	zero_vector := vec3.Vec3{0, 0, 0}
-	
+
 	// this jumbo wumbo loop solves the rendering equations for path tracing
 	for x := start_x; x < end_x; x++ {
 		for y := start_y; y < end_y; y++ {
@@ -510,80 +516,52 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 			
 			camera_ray_dir.Sub(camera.Origin)
 			camera_ray_dir.Normalize()
-			color := zero_vector
+		
+			pixel_color, _, distance, emission, _ := trace(&object.Line{camera.Origin, camera_ray_dir})
 
-			for s := 0; s < samples; s++ {
-				hops_done := 0
-				origin := camera.Origin
-				direction := camera_ray_dir
-				cur_weight := 1.0
-				cur_color := zero_vector
-				hit_a_light_source := false
-				for h := 0; h < hops; h++ {
-					hops_done += 1
-					pixel_color, n, distance, emission, pdf := trace(&object.Line{origin, direction})
+			// no intersection, ray probably left the cornel box
+			if distance == inf {
+				frame_buffer[x][y] = zero_vector
+				break
+			}
 
-					// no intersection, ray probably left the cornel box
-					if distance == inf {
-						cur_color = zero_vector
-						break
-					}
+			// light attentuation (fall-off)
+			// lambert shading
+			// pixel_color.Scale(math.Abs(n.Dot(camera_ray_dir)))
 
-					// ---------------------------------------------------------------------------
-					// DO NOT USE closest_triangle BEFORE THIS LINE
-					// ONLY USE closest_triangle IF INTERSECTION OCCURRED
-					// ---------------------------------------------------------------------------
+			hit_a_light_source := false
 
-					// light attentuation (fall-off)
-					pixel_color.Scale(math.Pow(0.95, float64(hops_done-1)))
+			// hit a light source
+			if emission > 0.0 {
+				frame_buffer[x][y] = pixel_color
+				hit_a_light_source = true
+			} else {
+				// compute hitpoint
+				camera_ray_dir.Scale(distance)
+				camera.Origin.Add(camera_ray_dir)
+				
+				// cast shadow ray
+				shadow_ray_dir := lamp.Mesh[0].A
+				shadow_ray_dir.Sub(camera_ray_dir)
+				shadow_ray_dir.Normalize()
+				_, _, _, emission, _ := trace(&object.Line{camera.Origin, shadow_ray_dir})
 
-					cur_color.Add(pixel_color)
-					cur_weight += emission
-
-					// hit a light source
-					if emission > 0.0 {
-						hit_a_light_source = true
-						break
-					}
-
-					// bounce
-					// update origin
-					incident := direction
-					_ = incident
-					direction.Scale(distance)
-					origin.Add(direction)
-
-					// <update direction>
-					direction = pdf(incident, n)
-					// </update direction>
-				}
-
-				if hit_a_light_source {
-					cur_color.Scale(cur_weight)
-					color.Add(cur_color)
+				if emission > 0.0 {
+					frame_buffer[x][y] = pixel_color
+					hit_a_light_source = true	
+				} else {
+					frame_buffer[x][y] = zero_vector
 				}
 			}
-			color.Scale(1.0/float64(samples))
 
-			// prevent overflow
-			_max := color.X
-			if color.Y > color.X {
-				_max = color.Y
-			}
-			if color.Z > color.Y {
-				_max = color.Z
+			if hit_a_light_source {
+				// gamma correction
+				frame_buffer[x][y].X = math.Pow(frame_buffer[x][y].X/255, 1.0/2.20)
+				frame_buffer[x][y].Y = math.Pow(frame_buffer[x][y].Y/255, 1.0/2.20)
+				frame_buffer[x][y].Z = math.Pow(frame_buffer[x][y].Z/255, 1.0/2.20)
+				frame_buffer[x][y].Scale(255)
 			}
 
-			if _max > 255 {
-				color.Scale(255.0/_max)
-			}
-
-			frame_buffer[x][y] = color
-			// gamma correction
-			frame_buffer[x][y].X = math.Pow(frame_buffer[x][y].X/255, 1.0/2.20)
-			frame_buffer[x][y].Y = math.Pow(frame_buffer[x][y].Y/255, 1.0/2.20)
-			frame_buffer[x][y].Z = math.Pow(frame_buffer[x][y].Z/255, 1.0/2.20)
-			frame_buffer[x][y].Scale(255)
 		}
 	}
 
@@ -591,7 +569,7 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 }
 
 // renders a frame and generates an output png
-func render_frame(camera camera.Camera, samples int, hops int) [][]vec3.Vec3 {
+func render_frame(camera camera.Camera, lamp object.Object, hops int) [][]vec3.Vec3 {
 	// initialise g_buffers
 	frame_buffer := make([][]vec3.Vec3, int(camera.Width/1))
 
@@ -615,7 +593,7 @@ func render_frame(camera camera.Camera, samples int, hops int) [][]vec3.Vec3 {
 			int(c*(camera.Height/(cores))), 
 			int((c+1)*(camera.Height/(cores))), 
 			
-			camera, frame_buffer, samples, hops, &wg)
+			camera, frame_buffer, lamp, hops, &wg)
 	}
 	
 	wg.Wait()
