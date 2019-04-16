@@ -274,8 +274,8 @@ func main() {
 			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, 0}, vec3.Vec3{0, room_size, room_size}, diffuse_pdf, red},
 			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, room_size}, vec3.Vec3{0, 0, room_size}, diffuse_pdf, red},
 			// right wall
-			object.Triangle{vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, blue},
-			object.Triangle{vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, blue},
+			object.Triangle{vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, purple},
+			object.Triangle{vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, purple},
 			// ceiling
 			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, room_size}, vec3.Vec3{room_size, 0, room_size}, diffuse_pdf, purple},
 			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, purple},
@@ -496,6 +496,7 @@ func main() {
 					camdir *= -1
 				}
 				camera.Move(0, 0, camdir)
+				// camera.Rotate_y(0.1)
 			}
 		}
 

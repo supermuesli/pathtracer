@@ -14,3 +14,15 @@ func (c *Camera) Move(x float64, y float64, z float64) {
 	c.Origin.Y += y
 	c.Origin.Z += z
 }
+
+func (c *Camera) Rotate_x(x float64) {
+	c.Origin.Rotate_x(x)
+}
+
+func (c *Camera) Rotate_y(x float64) {
+	c.Origin.Rotate_y(x)
+}
+
+func (c *Camera) Rotate_z(x float64) {
+	c.Origin.Rotate_z(x)
+}
