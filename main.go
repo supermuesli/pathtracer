@@ -97,8 +97,6 @@ func trace(ray *object.Line) (vec3.Vec3, vec3.Vec3, float64, float64, (func(vec3
 		}
 	}
 
-	fmt.Println(min_dist)
-
 	return closest_hit_color, normal, min_dist, emission, pdf
 }
 
@@ -275,14 +273,14 @@ func main() {
 			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, 0}, vec3.Vec3{0, room_size, room_size}, diffuse_pdf, red},
 			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, room_size}, vec3.Vec3{0, 0, room_size}, diffuse_pdf, red},
 			// right wall
-			object.Triangle{vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, 0, 0}, specular_pdf, white},
-			object.Triangle{vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, 0, 0}, specular_pdf, white},
+			object.Triangle{vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, blue},
+			object.Triangle{vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, blue},
 			// ceiling
 			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, room_size}, vec3.Vec3{room_size, 0, room_size}, diffuse_pdf, purple},
 			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, purple},
 			// floor
-			object.Triangle{vec3.Vec3{0, room_size, 0}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{0, room_size, room_size}, specular_pdf, white},
-			object.Triangle{vec3.Vec3{0, room_size, room_size}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, room_size, room_size}, specular_pdf, white},
+			object.Triangle{vec3.Vec3{0, room_size, 0}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{0, room_size, room_size}, diffuse_pdf, blue},
+			object.Triangle{vec3.Vec3{0, room_size, room_size}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, room_size, room_size}, diffuse_pdf, blue},
 		},
 	}
 
@@ -414,7 +412,7 @@ func main() {
 	sphere4 := object.Sphere {
 		vec3.Vec3{150, 350, 350},
 		90.0,
-		specular_pdf,
+		diffuse_pdf,
 		white,
 	}
 
@@ -470,14 +468,13 @@ func main() {
 	
 	// how many times a ray bounces
 	hops, err := strconv.Atoi(string(os.Args[1]))
-	
-	renderer.SetDrawColor(0, 0, 0, 255)
-	renderer.Clear()
-
 	frame_buffer := render_frame(camera, lamp1, hops)
 
 	// game loop
 	for {
+		renderer.SetDrawColor(0, 0, 0, 255)
+		renderer.Clear()
+
 		for x := 0; x < len(frame_buffer); x++ {
 			for y := 0; y < len(frame_buffer[0]); y++ {
 				// draw pixels
@@ -485,6 +482,9 @@ func main() {
 				renderer.DrawPoint(int32(x), int32(y))
 			} 
 		}
+
+		frame_buffer = render_frame(camera, lamp1, hops)
+		fmt.Println("frame")
 	}
 
 	// show pixels on window
@@ -500,7 +500,6 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 	// camera position data: compute this only once
 	cam_x := camera.Origin.X - float64(camera.Width/2)
 	cam_y := camera.Origin.Y - float64(camera.Height/2)
-	zero_vector := vec3.Vec3{0, 0, 0}
 
 	// this jumbo wumbo loop solves the rendering equations for path tracing
 	for x := start_x; x < end_x; x++ {
@@ -521,7 +520,6 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 
 			// no intersection, ray probably left the cornel box
 			if distance == inf {
-				frame_buffer[x][y] = zero_vector
 				break
 			}
 
@@ -549,8 +547,6 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 				if emission > 0.0 {
 					frame_buffer[x][y] = pixel_color
 					hit_a_light_source = true	
-				} else {
-					frame_buffer[x][y] = zero_vector
 				}
 			}
 
