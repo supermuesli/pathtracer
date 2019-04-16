@@ -20,10 +20,14 @@ type Sphere struct {
 	Radius float64
 	Pdf func(vec3.Vec3, vec3.Vec3) vec3.Vec3 
 	Mterial Material
+	// TODO Force vec3.Vec3
+	// TODO Mass float64
 }
 
 type Object struct {
 	Mesh []Triangle
+	// TODO Force vec3.Vec3
+	// TODO Mass float64
 }
 
 type Material struct {

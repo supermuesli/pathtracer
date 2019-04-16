@@ -441,13 +441,13 @@ func main() {
 	lamp1 := object.Object {
 		[]object.Triangle {
 			object.Triangle {
-				vec3.Vec3{float64(width/2) - float64(spotlight1_radius/2), 0.0000001, float64(depth/2) - float64(spotlight1_radius/2)}, 
-				vec3.Vec3{float64(width/2) + float64(spotlight1_radius/2), 0.0000001, float64(width/2) - float64(spotlight1_radius/2)}, 
-				vec3.Vec3{float64(width/2) - float64(spotlight1_radius/2), 0.0000001, float64(depth/2) + float64(spotlight1_radius/2)}, diffuse_pdf, white_light},
+				vec3.Vec3{float64(width/2) - float64(spotlight1_radius/2), 1.0, float64(depth/2) - float64(spotlight1_radius/2)}, 
+				vec3.Vec3{float64(width/2) + float64(spotlight1_radius/2), 1.0, float64(width/2) - float64(spotlight1_radius/2)}, 
+				vec3.Vec3{float64(width/2) - float64(spotlight1_radius/2), 1.0, float64(depth/2) + float64(spotlight1_radius/2)}, diffuse_pdf, white_light},
 			object.Triangle {
-				vec3.Vec3{float64(width/2) - float64(spotlight1_radius/2), 0.0000001, float64(depth/2) + float64(spotlight1_radius/2),}, 
-				vec3.Vec3{float64(width/2) + float64(spotlight1_radius/2), 0.0000001, float64(depth/2) - float64(spotlight1_radius/2),}, 
-				vec3.Vec3{float64(width/2) + float64(spotlight1_radius/2), 0.0000001, float64(depth/2) + float64(spotlight1_radius/2)}, diffuse_pdf, white_light},
+				vec3.Vec3{float64(width/2) - float64(spotlight1_radius/2), 1.0, float64(depth/2) + float64(spotlight1_radius/2),}, 
+				vec3.Vec3{float64(width/2) + float64(spotlight1_radius/2), 1.0, float64(depth/2) - float64(spotlight1_radius/2),}, 
+				vec3.Vec3{float64(width/2) + float64(spotlight1_radius/2), 1.0, float64(depth/2) + float64(spotlight1_radius/2)}, diffuse_pdf, white_light},
 		},
 	}
 
@@ -530,6 +530,7 @@ func main() {
 			zdir *= -1
 		}
 		spheres[0].Move(xdir, ydir, zdir)
+		objects[1].Move(xdir, ydir, zdir)
 	}
 
 }
@@ -600,7 +601,7 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 					frame_buffer[x][y] = zero_vector
 				} else {
 					// hit a light source
-					frame_buffer[x][y].Scale(math.Abs(n.Dot(shadow_ray_dir)))
+					frame_buffer[x][y].Scale(max(0, n.Dot(shadow_ray_dir)))
 				}
 			}
 		}
