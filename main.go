@@ -2,11 +2,8 @@ package main
 
 import (
 	"github.com/supermuesli/pathtracer/vec3"
-	"github.com/supermuesli/pathtracer/object"
-	"github.com/supermuesli/pathtracer/camera"
 	// "github.com/pkg/profile"
 	"github.com/veandco/go-sdl2/sdl"
-	"math"
     "sync"
 	"image"
 	"image/color"
@@ -14,134 +11,18 @@ import (
 	"log"
 	"os"
 	"fmt"
-	"math/rand"
-	"strconv"
-	_ "time"
 )
 
 const (
-	window_width = 500
-	window_height = 500
+	window_width = 1366
+	window_height = 768
 )
 
-var floats []float64
-var float_offset int = -1
-var float_amount int = 1000000
-var inf float64 = math.Inf(1)
-var objects []object.Object
-var spheres []object.Sphere
-var lamp_middle vec3.Vec3
+var input_images [][][]vec3.Vec3
+var input_images_eyes [][][]vec3.Vec3
+var frame_buffer [][]vec3.Vec3
 
-// returns the next random float in sequence
-func rand_float() float64 {
-	float_offset = (float_offset + 1) % float_amount 
-	return floats[float_offset]
-}
-
-// returns next random float (possibly negative) in sequence
-func rand_neg_float() float64 {
-	res := rand_float()
-	if rand_float() < 0.5 {
-		return -res
-	}
-
-	return res
-}
-
-// takes a ray and checks for intersections among all objects in world space
-// returns color, normal, hit distance and emission
-func trace(ray *object.Line) (vec3.Vec3, vec3.Vec3, float64, float64, (func(vec3.Vec3, vec3.Vec3) vec3.Vec3)) {
-	min_dist := inf
-	closest_hit_color := vec3.Vec3{0, 0, 0}
-	normal := vec3.Vec3{0, 0, 0}
-	emission := 0.0
-	var pdf func(vec3.Vec3, vec3.Vec3) vec3.Vec3
-
-	for i := 0; i < len(objects); i++ {
-		// iterate through object mesh (triangles)
-		for j := 0; j < len(objects[i].Mesh); j++ {
-			// camera ray
-			intersection, hit_distance := objects[i].Mesh[j].Intersection(ray)
-			if intersection {
-				// only keep the closest intersections
-				if hit_distance < min_dist {
-					min_dist = hit_distance
-					closest_hit_color = objects[i].Mesh[j].Mterial.Diffuse_color
-					normal = surface_normal(&objects[i].Mesh[j])
-					emission = objects[i].Mesh[j].Mterial.Emission
-					pdf = objects[i].Mesh[j].Pdf
-				}
-			}
-		}
-	}
-
-	for i := 0; i < len(spheres); i++ {
-		intersection, hit_distance := spheres[i].Intersection(ray)
-		if intersection {
-			// only keep the closest intersections
-			if hit_distance < min_dist {
-				min_dist = hit_distance
-				closest_hit_color = spheres[i].Mterial.Diffuse_color
-				
-				// compute normal
-				hit_position := ray.Origin
-				d := ray.Dir
-				d.Scale(hit_distance)
-				hit_position.Add(d)
-				normal = hit_position
-				normal.Sub(spheres[i].Origin)
-				// normalize by dividing by radius instead of using Normalize()
-				// much faster :)
-				normal.Scale(1.0/spheres[i].Radius)
-
-				emission = spheres[i].Mterial.Emission
-				pdf = spheres[i].Pdf
-			}
-		}
-	}
-
-	return closest_hit_color, normal, min_dist, emission, pdf
-}
-
-func surface_normal(tri *object.Triangle) vec3.Vec3 {
-	a := tri.A
-	normal := tri.B
-	c := tri.C
-	normal.Sub(a)
-	c.Sub(a)
-	normal.Cross(c)
-	normal.Normalize()
-	return normal
-}
-
-func max (a float64, b float64) float64 {
-	if a < b {
-		return b
-	}
-
-	return a
-}
-
-func min (a float64, b float64) float64 {
-	if a > b {
-		return b
-	}
-
-	return a
-}
-
-func cosine_hemisphere_sample() vec3.Vec3 {
-	u1 := rand_float()
-    r := math.Sqrt(u1)
-    theta := 2 * math.Pi * rand_float()
- 
-    x := r * math.Cos(theta)
-    y := r * math.Sin(theta)
- 
-    return vec3.Vec3{x, y, math.Sqrt(max(0.0, 1.0 - u1))}
-}
-
-func save_frame_buffer_to_png(frame_buffer [][]vec3.Vec3, output_name string) {
+func save_frame_buffer_to_png(output_name string) {
 	// stores output image
 	img := image.NewNRGBA(image.Rect(0, 0, len(frame_buffer[0]), len(frame_buffer)))
 
@@ -173,6 +54,43 @@ func save_frame_buffer_to_png(frame_buffer [][]vec3.Vec3, output_name string) {
 	}
 }
 
+func read_image(path string) [][]vec3.Vec3 {
+	_frame_buffer := make([][]vec3.Vec3, window_width)
+
+	for x := 0; x < window_width; x++ {
+		_frame_buffer[x] = make([]vec3.Vec3, window_height)
+
+		for y := 0; y < window_height; y++ {
+			_frame_buffer[x][y] = vec3.Vec3{0, 0, 0}
+		}
+	}
+
+    infile, err := os.Open(path)
+    if err != nil {
+		log.Fatal(err)
+    }
+    defer infile.Close()
+
+    // Decode will figure out what type of image is in the file on its own.
+    // We just have to be sure all the image packages we want are imported.
+    src, _, err := image.Decode(infile)
+    if err != nil {
+		log.Fatal(err)
+    }
+
+    // Create a new  image
+    bounds := src.Bounds()
+    w, h := bounds.Max.X, bounds.Max.Y
+    for x := 0; x < w; x++ {
+        for y := 0; y < h; y++ {
+        	R, G, B, _ := src.At(x, y).RGBA()
+            _frame_buffer[x][y] = vec3.Vec3{float64(R%256), float64(G%256), float64(B%256)}
+        }
+    }
+
+    return _frame_buffer
+}
+
 func main() {
 	fmt.Println("starty print :)")
 
@@ -184,7 +102,7 @@ func main() {
 	}
 
 	window, err := sdl.CreateWindow (
-		"pathtracy boi",
+		"morphy boi",
 		sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
 		window_width, window_height,
 		sdl.WINDOW_OPENGL)
@@ -208,302 +126,59 @@ func main() {
 	//
 	// ************************************************************
 	//
-	// define materials
-	green := object.Material {
-		Diffuse_color : vec3.Vec3{0, 255, 0},
-		Emission      : 0,
-	}
 
-	white := object.Material {
-		Diffuse_color : vec3.Vec3{255, 255, 255},
-		Emission      : 0,
-	}
+	input_images = make([][][]vec3.Vec3, 2)
 
-	blue := object.Material {
-		Diffuse_color : vec3.Vec3{0, 0, 255},
-		Emission      : 0,
-	}
+	for a := 0; a < 2; a++ {
+		input_images[a] = make([][]vec3.Vec3, window_width)
 
-	red := object.Material {
-		Diffuse_color : vec3.Vec3{255, 0, 0},
-		Emission      : 0,
-	}
+		for x := 0; x < window_width; x++ {
+			input_images[a][x] = make([]vec3.Vec3, window_height)
 
-	purple := object.Material {
-		Diffuse_color : vec3.Vec3{200, 0, 200},
-		Emission      : 0,
-	}
-
-	white_light := object.Material {
-		Diffuse_color : vec3.Vec3{255, 255, 255},
-		Emission      : 1.0,
-	}
-
-	_ = blue
-	_ = red
-	_ = green
-	_ = purple
-	_ = white
-
-	diffuse_pdf := func(incident vec3.Vec3, n vec3.Vec3) vec3.Vec3 {
-		/*
-		direction := vec3.Vec3{rand_neg_float(), rand_neg_float(), rand_neg_float()}
-		for {
-			direction.Normalize()
-			if direction.Dot(n) >= 0 {
-				break
+			for y := 0; y < window_height; y++ {
+				input_images[a][x][y] = vec3.Vec3{0, 0, 0}
 			}
-			direction = vec3.Vec3{rand_neg_float(), rand_neg_float(), rand_neg_float()}
 		}
-		return direction
-		*/
-
-		return vec3.Vec3{666, 0, 0}
 	}
 
-	specular_pdf := func(incident vec3.Vec3, n vec3.Vec3) vec3.Vec3 {
-		n.Scale(2*incident.Dot(n))
-		incident.Sub(n)
-		return incident
+	input_images_eyes = make([][][]vec3.Vec3, 2)
+
+	for a := 0; a < 2; a++ {
+		input_images_eyes[a] = make([][]vec3.Vec3, window_width)
+
+		for x := 0; x < window_width; x++ {
+			input_images_eyes[a][x] = make([]vec3.Vec3, window_height)
+
+			for y := 0; y < window_height; y++ {
+				input_images_eyes[a][x][y] = vec3.Vec3{0, 0, 0}
+			}
+		}
 	}
 
-	room_size := 1000.0/2
+	frame_buffer = make([][]vec3.Vec3, window_width)
 
-	// declare objects in 3d space
-	room := object.Object {
-		[](object.Triangle) {
-			// back wall
-			object.Triangle{vec3.Vec3{0, 0, room_size}, vec3.Vec3{0, room_size, room_size}, vec3.Vec3{room_size, room_size, room_size}, diffuse_pdf, green},
-			object.Triangle{vec3.Vec3{0, 0, room_size}, vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, 0, room_size}, diffuse_pdf, green},
-			// left wall
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, 0}, vec3.Vec3{0, room_size, room_size}, diffuse_pdf, red},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, room_size}, vec3.Vec3{0, 0, room_size}, diffuse_pdf, red},
-			// right wall
-			object.Triangle{vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, purple},
-			object.Triangle{vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, purple},
-			// ceiling
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, room_size}, vec3.Vec3{room_size, 0, room_size}, diffuse_pdf, purple},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, purple},
-			// floor
-			object.Triangle{vec3.Vec3{0, room_size, 0}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{0, room_size, room_size}, diffuse_pdf, blue},
-			object.Triangle{vec3.Vec3{0, room_size, room_size}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, room_size, room_size}, diffuse_pdf, blue},
-		},
+	for x := 0; x < window_width; x++ {
+		frame_buffer[x] = make([]vec3.Vec3, window_height)
+
+		for y := 0; y < window_height; y++ {
+			frame_buffer[x][y] = vec3.Vec3{0, 0, 0}
+		}
 	}
 
-	cuboid_size := 10000.0
-
-	cuboid := object.Object {
-		[](object.Triangle) {
-			// back wall
-			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, diffuse_pdf, blue},
-			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}, diffuse_pdf, blue},
-			// left wall
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, diffuse_pdf, blue},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{0, 0, cuboid_size}, diffuse_pdf, blue},
-			// right wall
-			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, blue},
-			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, blue},
-			// ceiling
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}, diffuse_pdf, blue},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, blue},
-			// floor
-			object.Triangle{vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, diffuse_pdf, blue},
-			object.Triangle{vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, diffuse_pdf, blue},
-			// front plane
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, diffuse_pdf, blue},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, blue},
-		},
-	}
-
-	cuboid2 := object.Object {
-		[](object.Triangle) {
-			// back wall
-			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}, diffuse_pdf, white},
-			// left wall
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{0, 0, cuboid_size}, diffuse_pdf, white},
-			// right wall
-			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
-			// ceiling
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
-			// floor
-			object.Triangle{vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, diffuse_pdf, white},
-			// front plane
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
-		},
-	}
-
-	cuboid3 := object.Object {
-		[](object.Triangle) {
-			// back wall
-			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}, diffuse_pdf, white},
-			// left wall
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{0, 0, cuboid_size}, diffuse_pdf, white},
-			// right wall
-			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
-			// ceiling
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
-			// floor
-			object.Triangle{vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, diffuse_pdf, white},
-			// front plane
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
-		},
-	}
-
-	cuboid4 := object.Object {
-		[](object.Triangle) {
-			// back wall
-			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}, diffuse_pdf, white},
-			// left wall
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{0, 0, cuboid_size}, diffuse_pdf, white},
-			// right wall
-			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
-			// ceiling
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
-			// floor
-			object.Triangle{vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, diffuse_pdf, white},
-			// front plane
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
-		},
-	}
-
-	// example of how you can move an object
-	cuboid.Move(-2500, -2500, -5000)
-	cuboid2.Move(1 + cuboid_size, 1 + cuboid_size, 1 + cuboid_size)
-
-	cuboid3.Move(1 + 1.8*cuboid_size, 1 + 1.6*cuboid_size, 1 + 2*cuboid_size)
-	cuboid3.Rotate_x(0.5)
-	cuboid3.Rotate_y(0.3)
-	cuboid3.Rotate_z(0.5)
-	cuboid3.Move(-430, -270, -20)
-
-	sphere1 := object.Sphere {
-		vec3.Vec3{150, 150, 250},
-		120.0,
-		specular_pdf,
-		white,
-	}
-
-	sphere2 := object.Sphere {
-		vec3.Vec3{350, 350, 150},
-		120.0,
-		specular_pdf,
-		white,
-	}
-
-	sphere3 := object.Sphere {
-		vec3.Vec3{400, 100, 350},
-		90.0,
-		specular_pdf,
-		white,
-	}
-
-	sphere4 := object.Sphere {
-		vec3.Vec3{150, 350, 350},
-		90.0,
-		specular_pdf,
-		white,
-	}
-
-	// output dimensions
-	width := 1000/2
-	height := 1000/2
-
-	// define camera (and image output dimensions)
-	camera := camera.Camera { 
-		Width: width,
-		Height: height,
-		Origin: vec3.Vec3{float64(width/2), float64(height/2), -float64(height)},
-	}
-
-	// define light sources
-	spotlight1_radius := 200.0/2
-
-	depth := height
-
-	lamp1 := object.Object {
-		[]object.Triangle {
-			object.Triangle {
-				vec3.Vec3{float64(width/2) - float64(spotlight1_radius/2), 1.0, float64(depth/2) - float64(spotlight1_radius/2)}, 
-				vec3.Vec3{float64(width/2) + float64(spotlight1_radius/2), 1.0, float64(width/2) - float64(spotlight1_radius/2)}, 
-				vec3.Vec3{float64(width/2) - float64(spotlight1_radius/2), 1.0, float64(depth/2) + float64(spotlight1_radius/2)}, diffuse_pdf, white_light},
-			object.Triangle {
-				vec3.Vec3{float64(width/2) - float64(spotlight1_radius/2), 1.0, float64(depth/2) + float64(spotlight1_radius/2),}, 
-				vec3.Vec3{float64(width/2) + float64(spotlight1_radius/2), 1.0, float64(depth/2) - float64(spotlight1_radius/2),}, 
-				vec3.Vec3{float64(width/2) + float64(spotlight1_radius/2), 1.0, float64(depth/2) + float64(spotlight1_radius/2)}, diffuse_pdf, white_light},
-		},
-	}
-
-	lamp_middle = lamp1.Mesh[0].A
-	lamp_middle.Add(vec3.Vec3{spotlight1_radius/2, 0, spotlight1_radius/2})
-
-	_ = cuboid
-	_ = cuboid2
-	_ = cuboid3
-	_ = cuboid4
-	_ = sphere1
-	_ = sphere2
-	_ = sphere3
-	_ = sphere4
-
-	objects = append(objects, room, lamp1)
-	spheres = append(spheres, sphere4)
-
-	// CPU profiling by default
-	// defer profile.Start().Stop()
-
-	// cache random floats for quicker computation
-	floats = make([]float64, float_amount)
-	for i := 0; i < float_amount; i++ {
-		floats[i] = rand.Float64()
-	}
-	
-	// how many times a ray bounces
-	hops := 5
-	frame_buffer := render_frame(camera, lamp1, hops)
-	save_frame_buffer_to_png(frame_buffer, "output@" + strconv.Itoa(hops) + "_hops")
+	input_images[0] = read_image("cat1.png")
+	input_images[1] = read_image("cat2.png")
+	input_images_eyes[0] = read_image("cat1_eyes.png")
+	input_images_eyes[1] = read_image("cat2_eyes.png")
 
 	renderer.SetDrawColor(0, 0, 0, 255)
 	renderer.Clear()
-	var event sdl.Event
-	_ = event
-	xdir := 10.0
-	ydir := 10.0
-	zdir := 10.0
-	camdir := 10.0
 
+	frames := 100
+	i := 0
+	render_frame(i, frames)
 	// game loop
 	for {
-		// read keyboard input
-		for event = sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
-			if event.GetType() == sdl.KEYDOWN {
-				if camera.Origin.Z > float64(height) {
-					camdir *= -1
-				}
-				if camera.Origin.Z < -float64(height) {
-					camdir *= -1
-				}
-				camera.Move(0, 0, camdir)
-				// camera.Rotate_y(0.1)
-			}
-		}
+		i = (i+1)%frames
 
 		for x := 0; x < len(frame_buffer); x++ {
 			for y := 0; y < len(frame_buffer[0]); y++ {
@@ -513,96 +188,28 @@ func main() {
 			} 
 		}
 
-		frame_buffer = render_frame(camera, lamp1, hops)
+		render_frame(i, frames)
 
 		// show pixels on window
 		renderer.Present()
-
-		if (spheres[0].Origin.X + spheres[0].Radius >= float64(width)) || (spheres[0].Origin.X - spheres[0].Radius <= 0) {
-			xdir *= -1
-		}
-
-		if (spheres[0].Origin.Y + spheres[0].Radius >= float64(height)) || (spheres[0].Origin.Y - spheres[0].Radius <= 0) {
-			ydir *= -1
-		}
-
-		if (spheres[0].Origin.Z + spheres[0].Radius >= float64(height)) || (spheres[0].Origin.Z - spheres[0].Radius <= 0) {
-			zdir *= -1
-		}
-		spheres[0].Move(xdir, ydir, zdir)
-		objects[1].Move(xdir, ydir, zdir)
 	}
-
 }
 
-func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera camera.Camera, frame_buffer [][]vec3.Vec3, lamp object.Object, hops int, wg **sync.WaitGroup) {
+func render_frame_thread(start_x int, end_x int, start_y int, end_y int, frame_number int, frame_cap int, wg **sync.WaitGroup) {
 	// multithreading magic, don't touch this
 	_wg := *wg
 	defer _wg.Done()
 
-	// camera position data: compute this only once
-	cam_x := camera.Origin.X - float64(camera.Width/2)
-	cam_y := camera.Origin.Y - float64(camera.Height/2)
-	// camera.Height is 1000, which is also the distance from camera to view plane
-	// TODO find a nicer way to implement this
-	cam_z := camera.Origin.Z + float64(camera.Height)
-	zero_vector := vec3.Vec3{0, 0, 0}
+	a := (float64(frame_cap) - float64(frame_number))/float64(frame_cap)
+	b := 1.0 - a
+	fmt.Println(a, b)
 
-	// this jumbo wumbo loop solves the rendering equations for path tracing
 	for x := start_x; x < end_x; x++ {
 		for y := start_y; y < end_y; y++ {
-			// generate camera ray
-			camera_ray_dir := vec3.Vec3 {
-				cam_x + float64(x), 
-				cam_y + float64(y), 
-				cam_z,
-			}
-			
-			camera_ray_dir.Sub(camera.Origin)
-			camera_ray_dir.Normalize()
-		
-			pixel_color, n, distance, emission, pdf := trace(&object.Line{camera.Origin, camera_ray_dir})
-			// no intersection, ray probably left the cornel box
-			if distance == inf {
-				continue
-			}
-
-			// compute hitpoint
-			camera_ray_dir.Scale(distance)
-			hit_point := camera.Origin
-			hit_point.Add(camera_ray_dir)
-
-			// TODO wrap this around a hop-loop
-			refl := pdf(camera_ray_dir, n)
-			if refl.X != 666.0 {
-				pixel_color, _, distance, emission, _ = trace(&object.Line{hit_point, refl})
-
-				if distance == inf {
-					continue
-				}
-			}
-
-			frame_buffer[x][y] = pixel_color
-
-			// hit a non-light-emitting object
-			if emission == 0.0 {
-				// cast shadow ray
-				shadow_ray_dir := lamp_middle
-				shadow_ray_dir.Sub(hit_point)
-				shadow_ray_dir.Normalize()
-				_, n, distance, emission, _ = trace(&object.Line{hit_point, shadow_ray_dir})
-
-				if distance == inf {
-					continue
-				}
-
-				if emission == 0.0 {
-					// didn't hit a light source
-					frame_buffer[x][y] = zero_vector
-				} else {
-					// hit a light source
-					frame_buffer[x][y].Scale(max(0, n.Dot(shadow_ray_dir)))
-				}
+			frame_buffer[x][y] = vec3.Vec3 {
+				((a*(input_images[0][x][y].X)) + (b*(input_images[1][x][y].X))), 
+				((a*(input_images[0][x][y].Y)) + (b*(input_images[1][x][y].Y))), 
+				((a*(input_images[0][x][y].Z)) + (b*(input_images[1][x][y].Z))),
 			}
 		}
 	}
@@ -611,18 +218,7 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 }
 
 // renders a frame and generates an output png
-func render_frame(camera camera.Camera, lamp object.Object, hops int) [][]vec3.Vec3 {
-	// initialise g_buffers
-	frame_buffer := make([][]vec3.Vec3, int(camera.Width/1))
-
-	for x := 0; x < camera.Width; x++ {
-		frame_buffer[x] = make([]vec3.Vec3, int(camera.Height/1))
-
-		for y := 0; y < camera.Height; y++ {
-			frame_buffer[x][y] = vec3.Vec3{0, 0, 0}
-		}
-	}
-
+func render_frame(frame_number int, frame_cap int) {
 	// multithreading using n cpu-cores
 	cores := 4
 	wg := new(sync.WaitGroup)
@@ -630,15 +226,13 @@ func render_frame(camera camera.Camera, lamp object.Object, hops int) [][]vec3.V
 		wg.Add(1)
 		go render_frame_thread (
 			int(0), 
-			int(camera.Width), 
+			int(window_width), 
 			
-			int(c*(camera.Height/(cores))), 
-			int((c+1)*(camera.Height/(cores))), 
+			int(c*(window_height/(cores))), 
+			int((c+1)*(window_height/(cores))), 
 			
-			camera, frame_buffer, lamp, hops, &wg)
+			frame_number, frame_cap, &wg)
 	}
 	
 	wg.Wait()
-
-	return frame_buffer
 }
