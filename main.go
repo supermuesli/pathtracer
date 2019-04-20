@@ -4,7 +4,7 @@ import (
 	"github.com/supermuesli/pathtracer/vec3"
 	"github.com/supermuesli/pathtracer/object"
 	"github.com/supermuesli/pathtracer/camera"
-	// "github.com/pkg/profile"
+	_ "github.com/pkg/profile"
 	"github.com/veandco/go-sdl2/sdl"
 	"math"
     "sync"
@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"math/rand"
 	"strconv"
-	_ "time"
+	"time"
 )
 
 const (
@@ -26,13 +26,16 @@ const (
 
 var floats []float64
 var float_offset int = -1
-var float_amount int = 1000000
+var float_amount int = 100000
 var zero_vector = vec3.Vec3{0, 0, 0}
 var inf float64 = math.Inf(1)
 var objects []object.Object
 var spheres []object.Sphere
 var lamp_middle vec3.Vec3
 var frame_buffer [][]vec3.Vec3
+var cam_x float64 
+var cam_y float64
+var cam_z float64
 
 // returns the next random float in sequence
 func rand_float() float64 {
@@ -52,7 +55,7 @@ func rand_neg_float() float64 {
 
 // takes a ray and checks for intersections among all objects in world space
 // returns color, normal, hit distance and emission
-func trace(ray *object.Line) (vec3.Vec3, vec3.Vec3, float64, float64, (func(vec3.Vec3, vec3.Vec3) vec3.Vec3)) {
+func trace(ray object.Line) (vec3.Vec3, vec3.Vec3, float64, float64, (func(vec3.Vec3, vec3.Vec3) vec3.Vec3)) {
 	min_dist := inf
 	closest_hit_color := vec3.Vec3{0, 0, 0}
 	normal := vec3.Vec3{0, 0, 0}
@@ -69,7 +72,7 @@ func trace(ray *object.Line) (vec3.Vec3, vec3.Vec3, float64, float64, (func(vec3
 				if hit_distance < min_dist {
 					min_dist = hit_distance
 					closest_hit_color = objects[i].Mesh[j].Mterial.Diffuse_color
-					normal = surface_normal(&objects[i].Mesh[j])
+					normal = surface_normal(objects[i].Mesh[j])
 					emission = objects[i].Mesh[j].Mterial.Emission
 					pdf = objects[i].Mesh[j].Pdf
 				}
@@ -105,7 +108,7 @@ func trace(ray *object.Line) (vec3.Vec3, vec3.Vec3, float64, float64, (func(vec3
 	return closest_hit_color, normal, min_dist, emission, pdf
 }
 
-func surface_normal(tri *object.Triangle) vec3.Vec3 {
+func surface_normal(tri object.Triangle) vec3.Vec3 {
 	a := tri.A
 	normal := tri.B
 	c := tri.C
@@ -434,6 +437,12 @@ func main() {
 		Height: height,
 		Origin: vec3.Vec3{float64(width/2), float64(height/2), -float64(height)},
 	}
+	// camera position data: compute this only once
+	cam_x = camera.Origin.X - float64(camera.Width/2)
+	cam_y = camera.Origin.Y - float64(camera.Height/2)
+	// camera.Height is 1000, which is also the distance from camera to view plane
+	// TODO find a nicer way to implement this
+	cam_z = camera.Origin.Z + float64(camera.Height)
 
 	// define light sources
 	spotlight1_radius := 200.0/2
@@ -503,6 +512,7 @@ func main() {
 
 	// game loop
 	for {
+		time_before_render := time.Now()
 		// read keyboard input
 		for event = sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
 			if event.GetType() == sdl.KEYDOWN {
@@ -530,6 +540,7 @@ func main() {
 		// show pixels on window
 		renderer.Present()
 
+		// update positions
 		if (spheres[0].Origin.X + spheres[0].Radius >= float64(width)) || (spheres[0].Origin.X - spheres[0].Radius <= 0) {
 			xdir *= -1
 		}
@@ -542,21 +553,16 @@ func main() {
 			zdir *= -1
 		}
 		spheres[0].Move(xdir, ydir, zdir)
-	}
 
+		time_difference := time_before_render.Sub(time.Now()).Seconds()
+		fmt.Println(-1/time_difference, "fps")
+	}
 }
 
 func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera camera.Camera, lamp object.Object, hops int, wg **sync.WaitGroup) {
 	// multithreading magic, don't touch this
 	_wg := *wg
 	defer _wg.Done()
-
-	// camera position data: compute this only once
-	cam_x := camera.Origin.X - float64(camera.Width/2)
-	cam_y := camera.Origin.Y - float64(camera.Height/2)
-	// camera.Height is 1000, which is also the distance from camera to view plane
-	// TODO find a nicer way to implement this
-	cam_z := camera.Origin.Z + float64(camera.Height)
 
 	// this jumbo wumbo loop solves the rendering equations for path tracing
 	for x := start_x; x < end_x; x++ {
@@ -570,9 +576,8 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 			camera_ray_dir.Sub(camera.Origin)
 			camera_ray_dir.Normalize()
 		
-
 			// trace camera ray
-			pixel_color, n, distance, emission, pdf := trace(&object.Line{camera.Origin, camera_ray_dir})
+			pixel_color, n, distance, emission, pdf := trace(object.Line{camera.Origin, camera_ray_dir})
 			// no intersection, ray probably left the cornel box
 			if distance == inf {
 				frame_buffer[x][y] = zero_vector
@@ -588,7 +593,7 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 			// compute reflection if pdf is specular
 			refl := pdf(camera_ray_dir, n)
 			if refl.X != 666.0 {
-				pixel_color, _, distance, _, _ = trace(&object.Line{hit_point, refl})
+				pixel_color, _, distance, emission, _ = trace(object.Line{hit_point, refl})
 
 				if distance == inf {
 					frame_buffer[x][y] = zero_vector
@@ -604,7 +609,7 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 				shadow_ray_dir := lamp_middle
 				shadow_ray_dir.Sub(hit_point)
 				shadow_ray_dir.Normalize()
-				_, n, distance, emission, _ = trace(&object.Line{hit_point, shadow_ray_dir})
+				_, n, distance, emission, _ = trace(object.Line{hit_point, shadow_ray_dir})
 
 				if distance == inf || emission == 0 {
 					frame_buffer[x][y] = zero_vector

@@ -84,7 +84,7 @@ func min (a float64, b float64) float64 {
 	return b
 }
 
-func (s Sphere) Intersection(ray *Line) (bool, float64) {
+func (s Sphere) Intersection(ray Line) (bool, float64) {
 	ro_so := ray.Origin
 	ro_so.Sub(s.Origin)
 	rd_so_dot := ray.Dir.Dot(ro_so)
@@ -114,7 +114,7 @@ func (s Sphere) Intersection(ray *Line) (bool, float64) {
 	return false, math.Inf(1)
 }
 
-func (t Triangle) Intersection(ray *Line) (bool, float64) {
+func (t Triangle) Intersection(ray Line) (bool, float64) {
 	const epsilon = 0.0000001 // minimum offset distance (otherwise rays will always intersect the hit_positions they're on)
 
 	ta := t.A
