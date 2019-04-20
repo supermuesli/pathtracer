@@ -30,6 +30,7 @@ var float_amount int = 1000000
 var inf float64 = math.Inf(1)
 var objects []object.Object
 var spheres []object.Sphere
+var frame_buffer [][]vec3.Vec3
 
 // returns the next random float in sequence
 func rand_float() float64 {
@@ -464,6 +465,16 @@ func main() {
 	for i := 0; i < float_amount; i++ {
 		floats[i] = rand.Float64()
 	}
+
+	frame_buffer = make([][]vec3.Vec3, camera.Width)
+
+	for x := 0; x < camera.Width; x++ {
+		frame_buffer[x] = make([]vec3.Vec3, camera.Height)
+
+		for y := 0; y < camera.Height; y++ {
+			frame_buffer[x][y] = vec3.Vec3{0, 0, 0}
+		}
+	}
 	
 	// how many times a single pixel is sampled
 	pixel_samples, err := strconv.Atoi(string(os.Args[1]))
@@ -473,7 +484,7 @@ func main() {
 	renderer.SetDrawColor(0, 0, 0, 255)
 	renderer.Clear()
 
-	frame_buffer := render_frame(camera, pixel_samples, hops)
+	render_frame(camera, pixel_samples, hops)
 
 	for x := 0; x < len(frame_buffer); x++ {
 		for y := 0; y < len(frame_buffer[0]); y++ {
@@ -488,7 +499,7 @@ func main() {
 	save_frame_buffer_to_png(frame_buffer, "output@" + strconv.Itoa(pixel_samples) + "_samples")
 }
 
-func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera camera.Camera, frame_buffer [][]vec3.Vec3, samples int, hops int, wg **sync.WaitGroup) {
+func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera camera.Camera, samples int, hops int, wg **sync.WaitGroup) {
 	// multithreading magic, don't touch this
 	_wg := *wg
 	defer _wg.Done()
@@ -593,18 +604,7 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 }
 
 // renders a frame and generates an output png
-func render_frame(camera camera.Camera, samples int, hops int) [][]vec3.Vec3 {
-	// initialise g_buffers
-	frame_buffer := make([][]vec3.Vec3, int(camera.Width/1))
-
-	for x := 0; x < camera.Width; x++ {
-		frame_buffer[x] = make([]vec3.Vec3, int(camera.Height/1))
-
-		for y := 0; y < camera.Height; y++ {
-			frame_buffer[x][y] = vec3.Vec3{0, 0, 0}
-		}
-	}
-
+func render_frame(camera camera.Camera, samples int, hops int) {
 	// multithreading using n cpu-cores
 	cores := 4
 	wg := new(sync.WaitGroup)
@@ -617,10 +617,8 @@ func render_frame(camera camera.Camera, samples int, hops int) [][]vec3.Vec3 {
 			int(c*(camera.Height/(cores))), 
 			int((c+1)*(camera.Height/(cores))), 
 			
-			camera, frame_buffer, samples, hops, &wg)
+			camera, samples, hops, &wg)
 	}
 	
 	wg.Wait()
-
-	return frame_buffer
 }
