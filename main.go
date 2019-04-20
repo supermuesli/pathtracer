@@ -585,7 +585,7 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 			}
 
 			// compute hitpoint
-			camera_ray_dir.Scale(distance*0.999)
+			camera_ray_dir.Scale(distance*0.99)
 			hit_point := camera.Origin
 			hit_point.Add(camera_ray_dir)
 
