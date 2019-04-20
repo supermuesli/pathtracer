@@ -27,10 +27,12 @@ const (
 var floats []float64
 var float_offset int = -1
 var float_amount int = 1000000
+var zero_vector = vec3.Vec3{0, 0, 0}
 var inf float64 = math.Inf(1)
 var objects []object.Object
 var spheres []object.Sphere
 var lamp_middle vec3.Vec3
+var frame_buffer [][]vec3.Vec3
 
 // returns the next random float in sequence
 func rand_float() float64 {
@@ -474,10 +476,20 @@ func main() {
 	for i := 0; i < float_amount; i++ {
 		floats[i] = rand.Float64()
 	}
+
+	frame_buffer = make([][]vec3.Vec3, int(camera.Width/1))
+
+	for x := 0; x < camera.Width; x++ {
+		frame_buffer[x] = make([]vec3.Vec3, int(camera.Height/1))
+
+		for y := 0; y < camera.Height; y++ {
+			frame_buffer[x][y] = vec3.Vec3{0, 0, 0}
+		}
+	}
 	
 	// how many times a ray bounces
 	hops := 5
-	frame_buffer := render_frame(camera, lamp1, hops)
+	render_frame(camera, lamp1, hops)
 	save_frame_buffer_to_png(frame_buffer, "output@" + strconv.Itoa(hops) + "_hops")
 
 	renderer.SetDrawColor(0, 0, 0, 255)
@@ -513,7 +525,7 @@ func main() {
 			} 
 		}
 
-		frame_buffer = render_frame(camera, lamp1, hops)
+		render_frame(camera, lamp1, hops)
 
 		// show pixels on window
 		renderer.Present()
@@ -530,12 +542,11 @@ func main() {
 			zdir *= -1
 		}
 		spheres[0].Move(xdir, ydir, zdir)
-		objects[1].Move(xdir, ydir, zdir)
 	}
 
 }
 
-func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera camera.Camera, frame_buffer [][]vec3.Vec3, lamp object.Object, hops int, wg **sync.WaitGroup) {
+func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera camera.Camera, lamp object.Object, hops int, wg **sync.WaitGroup) {
 	// multithreading magic, don't touch this
 	_wg := *wg
 	defer _wg.Done()
@@ -546,7 +557,6 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 	// camera.Height is 1000, which is also the distance from camera to view plane
 	// TODO find a nicer way to implement this
 	cam_z := camera.Origin.Z + float64(camera.Height)
-	zero_vector := vec3.Vec3{0, 0, 0}
 
 	// this jumbo wumbo loop solves the rendering equations for path tracing
 	for x := start_x; x < end_x; x++ {
@@ -564,11 +574,12 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 			pixel_color, n, distance, emission, pdf := trace(&object.Line{camera.Origin, camera_ray_dir})
 			// no intersection, ray probably left the cornel box
 			if distance == inf {
+				frame_buffer[x][y] = zero_vector
 				continue
 			}
 
 			// compute hitpoint
-			camera_ray_dir.Scale(distance)
+			camera_ray_dir.Scale(distance*0.999)
 			hit_point := camera.Origin
 			hit_point.Add(camera_ray_dir)
 
@@ -578,6 +589,7 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 				pixel_color, _, distance, emission, _ = trace(&object.Line{hit_point, refl})
 
 				if distance == inf {
+					frame_buffer[x][y] = zero_vector
 					continue
 				}
 			}
@@ -592,13 +604,9 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 				shadow_ray_dir.Normalize()
 				_, n, distance, emission, _ = trace(&object.Line{hit_point, shadow_ray_dir})
 
-				if distance == inf {
-					continue
-				}
-
-				if emission == 0.0 {
-					// didn't hit a light source
+				if distance == inf || emission == 0 {
 					frame_buffer[x][y] = zero_vector
+					continue
 				} else {
 					// hit a light source
 					frame_buffer[x][y].Scale(max(0, n.Dot(shadow_ray_dir)))
@@ -611,18 +619,7 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 }
 
 // renders a frame and generates an output png
-func render_frame(camera camera.Camera, lamp object.Object, hops int) [][]vec3.Vec3 {
-	// initialise g_buffers
-	frame_buffer := make([][]vec3.Vec3, int(camera.Width/1))
-
-	for x := 0; x < camera.Width; x++ {
-		frame_buffer[x] = make([]vec3.Vec3, int(camera.Height/1))
-
-		for y := 0; y < camera.Height; y++ {
-			frame_buffer[x][y] = vec3.Vec3{0, 0, 0}
-		}
-	}
-
+func render_frame(camera camera.Camera, lamp object.Object, hops int) {
 	// multithreading using n cpu-cores
 	cores := 4
 	wg := new(sync.WaitGroup)
@@ -635,10 +632,8 @@ func render_frame(camera camera.Camera, lamp object.Object, hops int) [][]vec3.V
 			int(c*(camera.Height/(cores))), 
 			int((c+1)*(camera.Height/(cores))), 
 			
-			camera, frame_buffer, lamp, hops, &wg)
+			camera, lamp, hops, &wg)
 	}
 	
 	wg.Wait()
-
-	return frame_buffer
 }
