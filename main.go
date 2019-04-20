@@ -567,10 +567,11 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 				cam_y + float64(y), 
 				cam_z,
 			}
-			
 			camera_ray_dir.Sub(camera.Origin)
 			camera_ray_dir.Normalize()
 		
+
+			// trace camera ray
 			pixel_color, n, distance, emission, pdf := trace(&object.Line{camera.Origin, camera_ray_dir})
 			// no intersection, ray probably left the cornel box
 			if distance == inf {
@@ -584,9 +585,10 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 			hit_point.Add(camera_ray_dir)
 
 			// TODO wrap this around a hop-loop
+			// compute reflection if pdf is specular
 			refl := pdf(camera_ray_dir, n)
 			if refl.X != 666.0 {
-				pixel_color, _, distance, emission, _ = trace(&object.Line{hit_point, refl})
+				pixel_color, _, distance, _, _ = trace(&object.Line{hit_point, refl})
 
 				if distance == inf {
 					frame_buffer[x][y] = zero_vector
