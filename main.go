@@ -31,6 +31,11 @@ var inf float64 = math.Inf(1)
 var objects []object.Object
 var spheres []object.Sphere
 var frame_buffer [][]vec3.Vec3
+var camera_ray_dir [][]vec3.Vec3
+var cam_x float64
+var cam_y float64
+var cam_z float64
+var zero_vector vec3.Vec3 = vec3.Vec3{0, 0, 0}
 
 // returns the next random float in sequence
 func rand_float() float64 {
@@ -430,6 +435,11 @@ func main() {
 		Origin: vec3.Vec3{float64(width/2), float64(height/2), -float64(width)},
 	}
 
+	// camera position data: compute this only once
+	cam_x = camera.Origin.X - float64(camera.Width/2)
+	cam_y = camera.Origin.Y - float64(camera.Height/2)
+	cam_z = camera.Origin.Z + float64(camera.Height)
+
 	// define light sources
 	spotlight1_radius := 200.0/2
 
@@ -453,9 +463,11 @@ func main() {
 	_ = cuboid3
 	_ = cuboid4
 	_ = sphere1
+	_ = sphere2
+	_ = sphere3
 
 	objects = append(objects, room, lamp1)
-	spheres = append(spheres, sphere1, sphere2, sphere3, sphere4)
+	spheres = append(spheres, sphere4)
 
 	// CPU profiling by default
 	// defer profile.Start().Stop()
@@ -473,6 +485,27 @@ func main() {
 
 		for y := 0; y < camera.Height; y++ {
 			frame_buffer[x][y] = vec3.Vec3{0, 0, 0}
+		}
+	}
+
+	// cache camera rays
+	camera_ray_dir = make([][]vec3.Vec3, camera.Width)
+
+	for x := 0; x < camera.Width; x++ {
+		camera_ray_dir[x] = make([]vec3.Vec3, camera.Height)
+
+		for y := 0; y < camera.Height; y++ {
+			// generate camera ray
+			camera_ray_dir[x][y] = vec3.Vec3 {
+				cam_x + float64(x), 
+				cam_y + float64(y), 
+				// camera.Height is 1000, which is also the distance from camera to view plane
+				// TODO find a nicer way to implement this
+				cam_z,
+			}
+
+			camera_ray_dir[x][y].Sub(camera.Origin)
+			camera_ray_dir[x][y].Normalize()
 		}
 	}
 	
@@ -504,31 +537,16 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 	_wg := *wg
 	defer _wg.Done()
 
-	// camera position data: compute this only once
-	cam_x := camera.Origin.X - float64(camera.Width/2)
-	cam_y := camera.Origin.Y - float64(camera.Height/2)
-	zero_vector := vec3.Vec3{0, 0, 0}
-	
 	// this jumbo wumbo loop solves the rendering equations for path tracing
 	for x := start_x; x < end_x; x++ {
 		for y := start_y; y < end_y; y++ {
-			// generate camera ray
-			camera_ray_dir := vec3.Vec3 {
-				cam_x + float64(x), 
-				cam_y + float64(y), 
-				// camera.Height is 1000, which is also the distance from camera to view plane
-				// TODO find a nicer way to implement this
-				camera.Origin.Z + float64(camera.Height),
-			}
-			
-			camera_ray_dir.Sub(camera.Origin)
-			camera_ray_dir.Normalize()
 			color := zero_vector
 
 			for s := 0; s < samples; s++ {
+
 				hops_done := 0
 				origin := camera.Origin
-				direction := camera_ray_dir
+				direction := camera_ray_dir[x][y]
 				cur_weight := 1.0
 				cur_color := zero_vector
 				hit_a_light_source := false
@@ -575,6 +593,7 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 					cur_color.Scale(cur_weight)
 					color.Add(cur_color)
 				}
+
 			}
 			color.Scale(1.0/float64(samples))
 
