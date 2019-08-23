@@ -4,8 +4,7 @@ import (
 	"github.com/supermuesli/pathtracer/vec3"
 	"github.com/supermuesli/pathtracer/object"
 	"github.com/supermuesli/pathtracer/camera"
-	// "github.com/pkg/profile"
-	"github.com/veandco/go-sdl2/sdl"
+	"github.com/pkg/profile"
 	"math"
     "sync"
 	"image"
@@ -186,35 +185,6 @@ func save_frame_buffer_to_png(frame_buffer [][]vec3.Vec3, output_name string) {
 
 func main() {
 	fmt.Println("starty print :)")
-
-	// init window
-
-	if err := sdl.Init(sdl.INIT_EVERYTHING); err != nil {
-		fmt.Println("initializing SDL", err)
-		return 
-	}
-
-	window, err := sdl.CreateWindow (
-		"pathtracy boi",
-		sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
-		window_width, window_height,
-		sdl.WINDOW_OPENGL)
-
-	if err != nil {
-		fmt.Println("initializing window")
-		return
-	}
-
-	defer window.Destroy()
-
-	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_ACCELERATED)
-
-	if err != nil {
-		fmt.Println("initializing renderer", err)
-		return
-	}
-
-	defer renderer.Destroy()
 
 	//
 	// ************************************************************
@@ -475,8 +445,6 @@ func main() {
 	objects = append(objects, room, lamp1)
 	spheres = append(spheres, sphere4)
 
-	// CPU profiling by default
-	// defer profile.Start().Stop()
 
 	// cache random floats for quicker computation
 	floats = make([]float64, float_amount)
@@ -523,6 +491,9 @@ func main() {
 	renderer.SetDrawColor(0, 0, 0, 255)
 	renderer.Clear()
 
+	// CPU profiling by default
+	defer profile.Start().Stop()
+
 	render_frame(camera, pixel_samples, hops)
 
 	for x := 0; x < len(frame_buffer); x++ {
@@ -537,14 +508,6 @@ func main() {
 			frame_buffer[x][y].Scale(255)
 			frame_buffer[x][y].Clamp()
 		}
-	}
-
-	for x := 0; x < len(frame_buffer); x++ {
-		for y := 0; y < len(frame_buffer[0]); y++ {
-			// draw pixels
-			renderer.SetDrawColor(uint8(frame_buffer[x][y].X), uint8(frame_buffer[x][y].Y), uint8(frame_buffer[x][y].Z), 255)
-			renderer.DrawPoint(int32(x), int32(y))
-		} 
 	}
 
 	// show pixels on window
