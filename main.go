@@ -507,8 +507,6 @@ func main() {
 		}
 	}
 
-	// show pixels on window
-	renderer.Present()
 	save_frame_buffer_to_png(frame_buffer, "output@" + strconv.Itoa(pixel_samples) + "_samples")
 }
 
