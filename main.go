@@ -484,7 +484,7 @@ func main() {
 	}
 	
 	// how many times a single pixel is sampled
-	pixel_samples, err := strconv.Atoi(string(os.Args[1]))
+	pixel_samples, _ := strconv.Atoi(string(os.Args[1]))
 	// how many times a ray bounces
 	hops               := 4
 	
