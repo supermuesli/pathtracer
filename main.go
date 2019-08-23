@@ -39,6 +39,12 @@ var zero_vector vec3.Vec3 = vec3.Vec3{0, 0, 0}
 
 // returns the next random float in sequence
 func rand_float() float64 {
+	if float_offset == 999999 {
+		for i := range floats {
+			j := rand.Intn(i + 1)
+			floats[i], floats[j] = floats[j], floats[i]
+		}
+	}
 	float_offset = (float_offset + 1) % float_amount 
 	return floats[float_offset]
 }
