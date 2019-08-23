@@ -488,9 +488,6 @@ func main() {
 	// how many times a ray bounces
 	hops               := 4
 	
-	renderer.SetDrawColor(0, 0, 0, 255)
-	renderer.Clear()
-
 	// CPU profiling by default
 	defer profile.Start().Stop()
 
