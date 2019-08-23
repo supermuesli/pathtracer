@@ -215,33 +215,33 @@ func main() {
 	//
 	// define materials
 	green := object.Material {
-		Diffuse_color : vec3.Vec3{0, 255, 0},
+		Diffuse_color : vec3.Vec3{0, 1, 0},
 		Emission      : 0,
 	}
 
 	white := object.Material {
-		Diffuse_color : vec3.Vec3{255, 255, 255},
+		Diffuse_color : vec3.Vec3{1, 1, 1},
 		Emission      : 0,
 	}
 
 	blue := object.Material {
-		Diffuse_color : vec3.Vec3{0, 0, 255},
+		Diffuse_color : vec3.Vec3{0, 0, 1},
 		Emission      : 0,
 	}
 
 	red := object.Material {
-		Diffuse_color : vec3.Vec3{255, 0, 0},
+		Diffuse_color : vec3.Vec3{1, 0, 0},
 		Emission      : 0,
 	}
 
 	purple := object.Material {
-		Diffuse_color : vec3.Vec3{200, 0, 200},
+		Diffuse_color : vec3.Vec3{0.8, 0, 0.8},
 		Emission      : 0,
 	}
 
 	white_light := object.Material {
-		Diffuse_color : vec3.Vec3{255, 255, 255},
-		Emission      : 1.0,
+		Diffuse_color : vec3.Vec3{1, 1, 1},
+		Emission      : 17.0,
 	}
 
 	_ = blue
@@ -281,14 +281,14 @@ func main() {
 			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, 0}, vec3.Vec3{0, room_size, room_size}, diffuse_pdf, red},
 			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, room_size}, vec3.Vec3{0, 0, room_size}, diffuse_pdf, red},
 			// right wall
-			object.Triangle{vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, 0, 0}, specular_pdf, white},
-			object.Triangle{vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, 0, 0}, specular_pdf, white},
+			object.Triangle{vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, white},
 			// ceiling
 			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, room_size}, vec3.Vec3{room_size, 0, room_size}, diffuse_pdf, purple},
 			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, purple},
 			// floor
-			object.Triangle{vec3.Vec3{0, room_size, 0}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{0, room_size, room_size}, specular_pdf, white},
-			object.Triangle{vec3.Vec3{0, room_size, room_size}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, room_size, room_size}, specular_pdf, white},
+			object.Triangle{vec3.Vec3{0, room_size, 0}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{0, room_size, room_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, room_size, room_size}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, room_size, room_size}, diffuse_pdf, white},
 		},
 	}
 
@@ -512,12 +512,26 @@ func main() {
 	// how many times a single pixel is sampled
 	pixel_samples, err := strconv.Atoi(string(os.Args[1]))
 	// how many times a ray bounces
-	hops               := 5
+	hops               := 4
 	
 	renderer.SetDrawColor(0, 0, 0, 255)
 	renderer.Clear()
 
 	render_frame(camera, pixel_samples, hops)
+
+	for x := 0; x < len(frame_buffer); x++ {
+		for y := 0; y < len(frame_buffer[0]); y++ {
+			// gamma correction
+			frame_buffer[x][y].X = math.Pow(frame_buffer[x][y].X, 1.0/1.20)
+			frame_buffer[x][y].Y = math.Pow(frame_buffer[x][y].Y, 1.0/1.20)
+			frame_buffer[x][y].Z = math.Pow(frame_buffer[x][y].Z, 1.0/1.20)
+			
+			
+			// scale and clamp
+			frame_buffer[x][y].Scale(255)
+			frame_buffer[x][y].Clamp()
+		}
+	}
 
 	for x := 0; x < len(frame_buffer); x++ {
 		for y := 0; y < len(frame_buffer[0]); y++ {
@@ -537,85 +551,51 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 	_wg := *wg
 	defer _wg.Done()
 
-	// this jumbo wumbo loop solves the rendering equations for path tracing
+	// rendering equation
 	for x := start_x; x < end_x; x++ {
 		for y := start_y; y < end_y; y++ {
 			color := zero_vector
 
 			for s := 0; s < samples; s++ {
-
-				hops_done := 0
 				origin := camera.Origin
 				direction := camera_ray_dir[x][y]
-				cur_weight := 1.0
-				cur_color := zero_vector
-				hit_a_light_source := false
+				cur_weight := 0.0
+				cur_color := vec3.Vec3{1.0, 1.0, 1.0}
 				for h := 0; h < hops; h++ {
-					hops_done += 1
 					pixel_color, n, distance, emission, pdf := trace(&object.Line{origin, direction})
 
 					// no intersection, ray probably left the cornel box
 					if distance == inf {
-						cur_color = zero_vector
 						break
 					}
 
-					// ---------------------------------------------------------------------------
-					// DO NOT USE closest_triangle BEFORE THIS LINE
-					// ONLY USE closest_triangle IF INTERSECTION OCCURRED
-					// ---------------------------------------------------------------------------
-
 					// light attentuation (fall-off)
-					pixel_color.Scale(math.Pow(0.95, float64(hops_done-1)))
-
-					cur_color.Add(pixel_color)
+					pixel_color.Scale(math.Abs(n.Dot(n)))
+					
 					cur_weight += emission
+					cur_color.Component_wise_mul(pixel_color)
 
 					// hit a light source
 					if emission > 0.0 {
-						hit_a_light_source = true
 						break
 					}
 
 					// bounce
 					// update origin
 					incident := direction
-					_ = incident
 					direction.Scale(distance)
 					origin.Add(direction)
 
-					// <update direction>
+					// update direction
 					direction = pdf(incident, n)
-					// </update direction>
 				}
 
-				if hit_a_light_source {
-					cur_color.Scale(cur_weight)
-					color.Add(cur_color)
-				}
-
+				cur_color.Scale(cur_weight)
+				color.Add(cur_color)
 			}
+
 			color.Scale(1.0/float64(samples))
-
-			// prevent overflow
-			_max := color.X
-			if color.Y > color.X {
-				_max = color.Y
-			}
-			if color.Z > color.Y {
-				_max = color.Z
-			}
-
-			if _max > 255 {
-				color.Scale(255.0/_max)
-			}
-
 			frame_buffer[x][y] = color
-			// gamma correction
-			frame_buffer[x][y].X = math.Pow(frame_buffer[x][y].X/255, 1.0/2.20)
-			frame_buffer[x][y].Y = math.Pow(frame_buffer[x][y].Y/255, 1.0/2.20)
-			frame_buffer[x][y].Z = math.Pow(frame_buffer[x][y].Z/255, 1.0/2.20)
-			frame_buffer[x][y].Scale(255)
 		}
 	}
 

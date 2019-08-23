@@ -32,6 +32,18 @@ func (a *Vec3) Component_wise_mul(b Vec3) {
 	a.Z *= b.Z
 }
 
+func (a *Vec3) Clamp() {
+	if a.X > 255.0 {
+		a.X = 255.0
+	}
+	if a.Y > 255.0 {
+		a.Y = 255.0
+	}
+	if a.Z > 255.0 {
+		a.Z = 255.0
+	}
+}
+
 func (a Vec3) Dot(b Vec3) float64 {
 	return a.X * b.X + a.Y * b.Y + a.Z * b.Z
 }
