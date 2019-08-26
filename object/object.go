@@ -107,7 +107,7 @@ func (s Sphere) Intersection(ray *Line) (bool, float64) {
 }
 
 func (t Triangle) Intersection(ray *Line) (bool, float64) {
-	const epsilon = 0.0000001 // minimum offset distance (otherwise rays will always intersect the hit_positions they're on)
+	const epsilon = 0.001 // minimum offset distance (otherwise rays will always intersect the hit_positions they're on)
 
 	ta := t.A
 	edge1 := t.B

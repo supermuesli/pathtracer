@@ -4,7 +4,7 @@ import (
 	"github.com/supermuesli/pathtracer/vec3"
 	"github.com/supermuesli/pathtracer/object"
 	"github.com/supermuesli/pathtracer/camera"
-	"github.com/pkg/profile"
+	//"github.com/pkg/profile"
 	"math"
     "sync"
 	"image"
@@ -25,7 +25,7 @@ const (
 
 var floats []float64
 var float_offset int = -1
-var float_amount int = 1000000
+var float_amount int = 100000000
 var inf float64 = math.Inf(1)
 var objects []object.Object
 var spheres []object.Sphere
@@ -38,12 +38,6 @@ var zero_vector vec3.Vec3 = vec3.Vec3{0, 0, 0}
 
 // returns the next random float in sequence
 func rand_float() float64 {
-	if float_offset == 999999 {
-		for i := range floats {
-			j := rand.Intn(i + 1)
-			floats[i], floats[j] = floats[j], floats[i]
-		}
-	}
 	float_offset = (float_offset + 1) % float_amount 
 	return floats[float_offset]
 }
@@ -251,45 +245,45 @@ func main() {
 	room := object.Object {
 		[](object.Triangle) {
 			// back wall
-			object.Triangle{vec3.Vec3{0, 0, room_size}, vec3.Vec3{0, room_size, room_size}, vec3.Vec3{room_size, room_size, room_size}, diffuse_pdf, green},
-			object.Triangle{vec3.Vec3{0, 0, room_size}, vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, 0, room_size}, diffuse_pdf, green},
+			object.Triangle{vec3.Vec3{0, 0, room_size}, vec3.Vec3{0, room_size, room_size}, vec3.Vec3{room_size, room_size, room_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, room_size}, vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, 0, room_size}, diffuse_pdf, white},
 			// left wall
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, 0}, vec3.Vec3{0, room_size, room_size}, diffuse_pdf, red},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, room_size}, vec3.Vec3{0, 0, room_size}, diffuse_pdf, red},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, 0}, vec3.Vec3{0, room_size, room_size}, diffuse_pdf, green},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, room_size, room_size}, vec3.Vec3{0, 0, room_size}, diffuse_pdf, green},
 			// right wall
-			object.Triangle{vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, white},
-			object.Triangle{vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, red},
+			object.Triangle{vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, room_size, room_size}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, red},
 			// ceiling
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, room_size}, vec3.Vec3{room_size, 0, room_size}, diffuse_pdf, purple},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, purple},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, room_size}, vec3.Vec3{room_size, 0, room_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{room_size, 0, room_size}, vec3.Vec3{room_size, 0, 0}, diffuse_pdf, white},
 			// floor
 			object.Triangle{vec3.Vec3{0, room_size, 0}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{0, room_size, room_size}, diffuse_pdf, white},
 			object.Triangle{vec3.Vec3{0, room_size, room_size}, vec3.Vec3{room_size, room_size, 0}, vec3.Vec3{room_size, room_size, room_size}, diffuse_pdf, white},
 		},
 	}
 
-	cuboid_size := 10000.0
+	cuboid_size := 200.0
 
 	cuboid := object.Object {
 		[](object.Triangle) {
 			// back wall
-			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, diffuse_pdf, blue},
-			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}, diffuse_pdf, blue},
+			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}, diffuse_pdf, white},
 			// left wall
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, diffuse_pdf, blue},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{0, 0, cuboid_size}, diffuse_pdf, blue},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{0, 0, cuboid_size}, diffuse_pdf, white},
 			// right wall
-			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, blue},
-			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, blue},
+			object.Triangle{vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
 			// ceiling
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}, diffuse_pdf, blue},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, blue},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, cuboid_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, 0, cuboid_size}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
 			// floor
-			object.Triangle{vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, diffuse_pdf, blue},
-			object.Triangle{vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, diffuse_pdf, blue},
+			object.Triangle{vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{0, cuboid_size, cuboid_size}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, cuboid_size, cuboid_size}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, cuboid_size}, diffuse_pdf, white},
 			// front plane
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, diffuse_pdf, blue},
-			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, blue},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{0, cuboid_size, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, diffuse_pdf, white},
+			object.Triangle{vec3.Vec3{0, 0, 0}, vec3.Vec3{cuboid_size, cuboid_size, 0}, vec3.Vec3{cuboid_size, 0, 0}, diffuse_pdf, white},
 		},
 	}
 
@@ -363,14 +357,16 @@ func main() {
 	}
 
 	// example of how you can move an object
-	cuboid.Move(-2500, -2500, -5000)
+	cuboid.Move(100, 150, 300)
+	cuboid.Rotate_y(0.4)
+	cuboid.Rotate_x(0.4)
 	cuboid2.Move(1 + cuboid_size, 1 + cuboid_size, 1 + cuboid_size)
 
 	cuboid3.Move(1 + 1.8*cuboid_size, 1 + 1.6*cuboid_size, 1 + 2*cuboid_size)
 	cuboid3.Rotate_x(0.5)
 	cuboid3.Rotate_y(0.3)
 	cuboid3.Rotate_z(0.5)
-	cuboid3.Move(-430, -270, -20)
+	cuboid3.Move(430, 270, 20)
 
 	sphere1 := object.Sphere {
 		vec3.Vec3{150, 150, 250},
@@ -394,7 +390,7 @@ func main() {
 	}
 
 	sphere4 := object.Sphere {
-		vec3.Vec3{150, 350, 350},
+		vec3.Vec3{150, 350, 300},
 		90.0,
 		specular_pdf,
 		white,
@@ -442,7 +438,7 @@ func main() {
 	_ = sphere2
 	_ = sphere3
 
-	objects = append(objects, room, lamp1)
+	objects = append(objects, room, lamp1, cuboid)
 	spheres = append(spheres, sphere4)
 
 
@@ -489,23 +485,9 @@ func main() {
 	hops               := 4
 	
 	// CPU profiling by default
-	defer profile.Start().Stop()
+	//defer profile.Start().Stop()
 
 	render_frame(camera, pixel_samples, hops)
-
-	for x := 0; x < len(frame_buffer); x++ {
-		for y := 0; y < len(frame_buffer[0]); y++ {
-			// gamma correction
-			frame_buffer[x][y].X = math.Pow(frame_buffer[x][y].X, 1.0/1.20)
-			frame_buffer[x][y].Y = math.Pow(frame_buffer[x][y].Y, 1.0/1.20)
-			frame_buffer[x][y].Z = math.Pow(frame_buffer[x][y].Z, 1.0/1.20)
-			
-			
-			// scale and clamp
-			frame_buffer[x][y].Scale(255)
-			frame_buffer[x][y].Clamp()
-		}
-	}
 
 	save_frame_buffer_to_png(frame_buffer, "output@" + strconv.Itoa(pixel_samples) + "_samples")
 }
@@ -560,6 +542,15 @@ func render_frame_thread(start_x int, end_x int, start_y int, end_y int, camera 
 
 			color.Scale(1.0/float64(samples))
 			frame_buffer[x][y] = color
+
+			// gamma correction
+			frame_buffer[x][y].X = math.Pow(frame_buffer[x][y].X, 1.0/1.20)
+			frame_buffer[x][y].Y = math.Pow(frame_buffer[x][y].Y, 1.0/1.20)
+			frame_buffer[x][y].Z = math.Pow(frame_buffer[x][y].Z, 1.0/1.20)
+			
+			// scale and clamp
+			frame_buffer[x][y].Scale(255)
+			frame_buffer[x][y].Clamp()
 		}
 	}
 
